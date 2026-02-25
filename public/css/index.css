@@ -1,0 +1,290 @@
+* {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f5f8fd 0%, #e8f0fb 100%);
+            color: #1a2d45;
+            overflow-x: hidden;
+        }
+
+        .container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+
+
+        .subtitle {
+            color: rgba(26, 45, 69, 0.7);
+            font-size: 14px;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+
+        .upload-area {
+            width: 100%;
+            max-width: 400px;
+            background: rgba(0, 84, 166, 0.1);
+            border: 2px dashed rgba(0, 84, 166, 0.4);
+            border-radius: 20px;
+            padding: 40px 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .upload-area:hover,
+        .upload-area.drag-over {
+            border-color: #0054a6;
+            background: rgba(0, 84, 166, 0.15);
+        }
+
+        .upload-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            background: rgba(0, 84, 166, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .upload-icon svg {
+            width: 40px;
+            height: 40px;
+            stroke: #0054a6;
+            fill: none;
+            stroke-width: 2;
+        }
+
+        .upload-text {
+            font-size: 16px;
+            color: #1a2d45;
+            margin-bottom: 10px;
+        }
+
+        .upload-hint {
+            font-size: 12px;
+            color: rgba(26, 45, 69, 0.6);
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 16px 20px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn svg {
+            width: 20px;
+            height: 20px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+        }
+
+        .btn-primary {
+            background: #0054a6;
+            color: #ffffff;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0, 84, 166, 0.4);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: rgba(0, 84, 166, 0.15);
+            color: #1a4080;
+            border: 1px solid rgba(0, 84, 166, 0.5);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(0, 84, 166, 0.25);
+        }
+
+        .preview-container {
+            margin-top: 30px;
+            width: 100%;
+            max-width: 400px;
+            display: none;
+        }
+
+        .preview-container.visible {
+            display: block;
+        }
+
+        .preview-image {
+            width: 100%;
+            max-height: 300px;
+            object-fit: contain;
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .preview-info {
+            margin-top: 10px;
+            font-size: 14px;
+            color: rgba(26, 45, 69, 0.7);
+            text-align: center;
+        }
+
+        .progress-container {
+            margin-top: 20px;
+            width: 100%;
+            max-width: 400px;
+            display: none;
+        }
+
+        .progress-container.visible {
+            display: block;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(0, 84, 166, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            width: 0%;
+            height: 100%;
+            background: #0054a6;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #1a4080;
+            text-align: center;
+        }
+
+        #ar-button {
+            margin-top: 30px;
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+            background: #0054a6;
+            border: none;
+            border-radius: 50px;
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 4px 30px rgba(0, 84, 166, 0.4);
+            transition: all 0.3s ease;
+            position: relative;
+            z-index: 100;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        #ar-button.visible {
+            display: flex;
+        }
+
+        #ar-button:active {
+            transform: scale(0.98);
+            background: #003d7a;
+        }
+
+        #ar-button svg {
+            width: 24px;
+            height: 24px;
+            stroke: #ffffff;
+            fill: none;
+            stroke-width: 2;
+        }
+
+        .result-container {
+            margin-top: 30px;
+            width: 100%;
+            max-width: 400px;
+            display: none;
+        }
+
+        .result-container.visible {
+            display: block;
+        }
+
+        .result-label {
+            font-size: 14px;
+            color: #0054a6;
+            margin-bottom: 10px;
+        }
+
+        .result-image {
+            width: 100%;
+            max-height: 300px;
+            object-fit: contain;
+            border-radius: 12px;
+            background: repeating-conic-gradient(#e8f0fb 0% 25%, #c5daf5 0% 50%) 50% / 20px 20px;
+        }
+
+        .error-message {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255, 100, 100, 0.2);
+            border: 1px solid rgba(255, 100, 100, 0.5);
+            border-radius: 10px;
+            color: #ff6464;
+            font-size: 14px;
+            display: none;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .error-message.visible {
+            display: block;
+        }
+
+        @media (max-width: 480px) {
+            .logo {
+                height: 40px;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+        }

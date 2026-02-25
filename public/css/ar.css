@@ -1,0 +1,416 @@
+* {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+        }
+
+        /* 카메라 배경 */
+        #video-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+        }
+
+        #video-background.mirror {
+            transform: scaleX(-1);
+        }
+
+        /* Three.js 캔버스 컨테이너 */
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* 터치 영역 */
+        #touch-area {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+        }
+
+        /* 상단 UI */
+        .top-ui {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .top-ui>* {
+            pointer-events: auto;
+        }
+
+        .btn-icon {
+            width: 44px;
+            height: 44px;
+            background: rgba(0, 30, 74, 0.8);
+            border: none;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: all 0.2s ease;
+        }
+
+        .btn-icon:hover {
+            background: rgba(0, 40, 90, 0.9);
+            transform: scale(1.05);
+        }
+
+        .btn-icon:active {
+            transform: scale(0.95);
+        }
+
+        .btn-icon svg {
+            width: 24px;
+            height: 24px;
+            stroke: #0054a6;
+            fill: none;
+            stroke-width: 2;
+        }
+
+        /* 하단 버튼 그룹 */
+        .bottom-ui {
+            position: fixed;
+            bottom: 40px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 30px;
+            z-index: 100;
+        }
+
+        /* 캡처 버튼 - 큰 원형 */
+        .btn-capture {
+            width: 70px;
+            height: 70px;
+            background: #0054a6;
+            border: 4px solid rgba(0, 30, 74, 0.5);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-capture:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 20px rgba(0, 84, 166, 0.5);
+        }
+
+        .btn-capture:active {
+            transform: scale(0.95);
+        }
+
+        .btn-capture .inner-circle {
+            width: 56px;
+            height: 56px;
+            background: #1a6fcc;
+            border-radius: 50%;
+            border: 2px solid rgba(0, 30, 74, 0.3);
+        }
+
+        /* 사이드 버튼들 */
+        .btn-side {
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 30, 74, 0.8);
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .btn-side:hover {
+            background: rgba(0, 40, 90, 0.9);
+            transform: scale(1.05);
+        }
+
+        .btn-side:active {
+            transform: scale(0.95);
+        }
+
+        .btn-side svg {
+            width: 24px;
+            height: 24px;
+            stroke: #0054a6;
+            fill: none;
+            stroke-width: 2;
+        }
+
+        /* 로딩 화면 */
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #001e4a 0%, #000f2e 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        #loading-screen.hidden {
+            display: none;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(0, 84, 166, 0.2);
+            border-top-color: #0054a6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-text {
+            margin-top: 20px;
+            color: #b3cff5;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 16px;
+            text-align: center;
+        }
+
+        /* 화면을 눌러 AR 시작 (iOS 사용자 제스처) */
+        .tap-to-start-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #001e4a 0%, #000f2e 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+            cursor: pointer;
+        }
+
+        .tap-to-start-overlay.hidden {
+            display: none;
+        }
+
+        .tap-to-start-text {
+            color: #0054a6;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 18px;
+            font-weight: 600;
+            padding: 20px 40px;
+        }
+
+        /* 에러 화면 */
+        .error-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #001e4a 0%, #000f2e 100%);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 1000;
+        }
+
+        .error-screen.visible {
+            display: flex;
+        }
+
+        .error-icon {
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 100, 100, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .error-icon svg {
+            width: 30px;
+            height: 30px;
+            stroke: #ff6464;
+            fill: none;
+            stroke-width: 2;
+        }
+
+        .error-message {
+            color: #b3cff5;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 16px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .btn-error {
+            padding: 16px 32px;
+            background: #0054a6;
+            border: none;
+            border-radius: 30px;
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-error:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 20px rgba(0, 84, 166, 0.4);
+        }
+
+        .btn-error svg {
+            width: 20px;
+            height: 20px;
+            stroke: #ffffff;
+            fill: none;
+            stroke-width: 2;
+        }
+
+        /* 안내 오버레이 - 세련된 디자인 */
+        .hint-overlay {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 30, 74, 0.95);
+            padding: 24px 36px;
+            border-radius: 16px;
+            color: #b3cff5;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 15px;
+            text-align: center;
+            z-index: 200;
+            pointer-events: auto;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+            line-height: 1.6;
+        }
+
+        .hint-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .hint-overlay .hint-title {
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #0054a6;
+        }
+
+        .hint-overlay .hint-text {
+            opacity: 0.9;
+            text-align: center;
+        }
+
+        /* 캡처 플래시 효과 */
+        .capture-flash {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0054a6;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 500;
+            transition: opacity 0.1s ease;
+        }
+
+        .capture-flash.flash {
+            opacity: 1;
+        }
+
+        /* 저장 완료 토스트 */
+        .toast {
+            position: fixed;
+            bottom: 140px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: rgba(0, 30, 74, 0.95);
+            color: #0054a6;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 300;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .toast.visible {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(0);
+        }
+

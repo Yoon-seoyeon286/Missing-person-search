@@ -5,7 +5,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // 정적 파일 서빙 (public 폴더)
-app.use(express.static(path.join(__dirname, '..', 'public'), {
+app.use(express.static(path.join(__dirname, 'public'), {
     setHeaders: (res, filePath) => {
         // HTTPS 카메라 접근을 위한 헤더
         res.setHeader('Permissions-Policy', 'camera=*, microphone=*, gyroscope=*, accelerometer=*');
@@ -16,7 +16,7 @@ app.use(express.static(path.join(__dirname, '..', 'public'), {
 
 // SPA 폴백
 app.get('{*path}', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(PORT, () => {

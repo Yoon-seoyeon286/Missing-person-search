@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "description": "Background removal and AR display app",
   "scripts": {
-    "start": "node ar-engine/server.js",
-    "dev": "node ar-engine/server.js"
+    "start": "node server.js",
+    "dev": "node server.js"
   },
   "dependencies": {
     "express": "^5.2.1"
