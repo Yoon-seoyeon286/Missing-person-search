@@ -219,9 +219,4 @@ npm install express-rate-limit
 
 ---
 
-## 향후 추가 예정
 
-- [ ] AI 전신 합성 (OpenAI gpt-image-1 — 키/몸무게 기반 체형 생성)
-- [ ] Face swap (Replicate API — 실제 얼굴 보존)
-- [ ] 이미지 자동 만료 및 삭제
-- [ ] 관리자 대시보드 (업로드 현황 확인)
