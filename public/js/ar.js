@@ -1,75 +1,3 @@
-// __GRANITE_NATIVE_EMITTER가 없으면 직접 생성 (web-bridge 모듈 없이 사용 시 필요)
-        if (!window.__GRANITE_NATIVE_EMITTER) {
-            window.__GRANITE_NATIVE_EMITTER = {
-                _events: {},
-                emit: function(event, data) {
-                    var cbs = this._events[event] || [];
-                    for (var i = 0; i < cbs.length; i++) cbs[i](data);
-                },
-                on: function(event, cb) {
-                    var self = this;
-                    if (!self._events[event]) self._events[event] = [];
-                    self._events[event].push(cb);
-                    return function() {
-                        self._events[event] = (self._events[event] || []).filter(function(fn) { return fn !== cb; });
-                    };
-                }
-            };
-        }
-        function _nativeEventId() {
-            return Math.random().toString(36).substring(2, 15);
-        }
-        function _callBridge(method, params) {
-            return new Promise(function(resolve, reject) {
-                if (!window.ReactNativeWebView) {
-                    reject(new Error('bridge_unavailable'));
-                    return;
-                }
-                var id = _nativeEventId();
-                var subs = [];
-                subs.push(window.__GRANITE_NATIVE_EMITTER.on(method + '/resolve/' + id, function(data) {
-                    subs.forEach(function(fn) { fn(); });
-                    resolve(data);
-                }));
-                subs.push(window.__GRANITE_NATIVE_EMITTER.on(method + '/reject/' + id, function(err) {
-                    subs.forEach(function(fn) { fn(); });
-                    reject(err);
-                }));
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                    type: 'method', functionName: method, eventId: id, args: [params]
-                }));
-            });
-        }
-        async function _requestCameraPermission() {
-            try {
-                await _callBridge('requestPermission', { name: 'camera', access: 'access' });
-                console.log('[AR] 카메라 권한 요청 완료');
-            } catch (e) {
-                console.warn('[AR] 카메라 권한 요청 실패 (비WebView 환경):', e.message);
-            }
-        }
-        async function _saveToGallery(blob) {
-            // granite.config.ts에 photos 권한이 선언되어 있으므로 런타임 요청 불필요
-            // saveBase64Data 직접 호출
-            return new Promise(function(resolve, reject) {
-                var reader = new FileReader();
-                reader.onload = async function(e) {
-                    var base64 = e.target.result.split(',')[1];
-                    var fileName = 'ar-capture-' + Date.now() + '.jpg';
-                    console.log('[AR] base64 길이:', base64.length);
-                    try {
-                        await _callBridge('saveBase64Data', { data: base64, fileName: fileName, mimeType: 'image/jpeg' });
-                        resolve('saved');
-                    } catch (bridgeErr) {
-                        var msg = bridgeErr && bridgeErr.message ? bridgeErr.message : JSON.stringify(bridgeErr);
-                        console.error('[AR] saveBase64Data 실패:', msg);
-                        reject(new Error('save_failed: ' + msg));
-                    }
-                };
-                reader.readAsDataURL(blob);
-            });
-        }
-
 // === State ===
         let video = null;
         let scene = null;
@@ -79,9 +7,6 @@
         let hudTexture = null;
         let hudMeshBaseScale = 1.0;
         let isRunning = false;
-        let currentFacing = 'environment';
-        let lastCapturedBlob = null;
-        let logoImage = null; // 로고 프리로드용
 
         // 제스처 상태
         const gesture = {
@@ -160,12 +85,6 @@
                 await loadImageFromBlob(imageBlob);
 
                 initEvents();
-
-                // 로고 프리로드
-                logoImage = new Image();
-                logoImage.src = 'logo.png';
-                logoImage.onerror = () => logoImage.src = 'el-logo.png';
-
                 hideLoading();
                 showHint();
 
@@ -185,9 +104,6 @@
             video = document.getElementById('video-background');
             if (!video) throw new Error('비디오 요소를 찾을 수 없습니다.');
 
-            // 토스 WebView: 네이티브 브릿지로 카메라 권한 먼저 요청
-            await _requestCameraPermission();
-
             // iOS WebView/Safari: 카메라 API 사용 가능 여부 확인
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 throw new Error('이 브라우저에서는 카메라를 사용할 수 없습니다. Safari 또는 앱을 최신 버전으로 업데이트해 주세요.');
@@ -199,7 +115,7 @@
             video.setAttribute('webkit-playsinline', '');
 
             try {
-                // 후면 카메라 시도 (exact 제거 - iOS 일부 기기에서 exact로 실패)
+                // 후면 카메라
                 let stream;
                 try {
                     stream = await navigator.mediaDevices.getUserMedia({
@@ -245,7 +161,6 @@
                 if (playPromise !== undefined) {
                     await playPromise;
                 }
-                currentFacing = 'environment';
 
                 console.log('[AR] 카메라 연결됨:', video.videoWidth, 'x', video.videoHeight);
 
@@ -436,18 +351,12 @@
 
             // 버튼 이벤트
             document.getElementById('btn-back').addEventListener('click', () => {
-                window.location.href = 'upload.html';
+                window.location.href = 'index.html';
             });
-
-            document.getElementById('btn-switch-camera').addEventListener('click', switchCamera);
 
             document.getElementById('btn-new-image').addEventListener('click', () => {
-                window.location.href = 'upload.html';
+                window.location.href = 'index.html';
             });
-
-            document.getElementById('btn-capture').addEventListener('click', captureScreen);
-
-            document.getElementById('btn-download').addEventListener('click', downloadCapture);
 
             // 안내 오버레이 터치하면 사라짐
             document.getElementById('hint-overlay').addEventListener('click', () => {
@@ -472,163 +381,6 @@
             const fovRad = THREE.MathUtils.degToRad(camera.fov);
             const screenHeight = window.innerHeight;
             return (2 * distance * Math.tan(fovRad / 2)) / screenHeight;
-        }
-
-        // === 카메라 전환 ===
-        async function switchCamera() {
-            currentFacing = currentFacing === 'environment' ? 'user' : 'environment';
-
-            try {
-                if (video.srcObject) {
-                    video.srcObject.getTracks().forEach(t => t.stop());
-                }
-
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: currentFacing,
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    }
-                });
-
-                video.srcObject = stream;
-                video.classList.toggle('mirror', currentFacing === 'user');
-                await video.play();
-
-                console.log('[AR] 카메라 전환:', currentFacing);
-
-            } catch (e) {
-                console.error('[AR] 카메라 전환 실패:', e);
-            }
-        }
-
-        // === 화면 캡처 ===
-        async function captureScreen() {
-            console.log('[AR] captureScreen 호출됨');
-            const arCanvas = document.querySelector('#canvas-container canvas');
-            if (!video || !arCanvas) {
-                console.error('[AR] 비디오 또는 AR 캔버스를 찾을 수 없음', { video: !!video, arCanvas: !!arCanvas });
-                alert('카메라 또는 AR 화면을 준비할 수 없습니다.');
-                return;
-            }
-
-            try {
-                // 플래시 효과
-                const flash = document.getElementById('capture-flash');
-                flash.classList.add('flash');
-                setTimeout(() => flash.classList.remove('flash'), 100);
-
-                showToast('캡처 중... 잠시만 기다려주세요');
-
-                // 캡처용 임시 캔버스 생성
-                const canvas = document.createElement('canvas');
-                canvas.width = arCanvas.width;
-                canvas.height = arCanvas.height;
-                const ctx = canvas.getContext('2d');
-
-                // 전면 카메라 미러링 처리
-                const isMirrored = currentFacing === 'user';
-                drawVideoCover(ctx, video, canvas.width, canvas.height, isMirrored);
-
-                // AR 오버레이 합성
-                ctx.drawImage(arCanvas, 0, 0);
-
-                // 3. 워터마크 로고 직접 합성 (비율 유지)
-                if (logoImage && logoImage.complete && logoImage.naturalWidth > 0) {
-                    const logoAspect = logoImage.naturalWidth / logoImage.naturalHeight;
-                    const lWidth = Math.min(canvas.width, canvas.height) * 0.20;
-                    const lHeight = lWidth / logoAspect;
-
-                    const lMargin = 30;
-                    const lx = canvas.width - lWidth - lMargin;
-                    const ly = canvas.height - lHeight - lMargin;
-
-                    ctx.save();
-                    ctx.globalAlpha = 0.6; // 워터마크용 투명도
-                    ctx.drawImage(logoImage, lx, ly, lWidth, lHeight);
-                    ctx.restore();
-                    console.log('[AR] 워터마크 직접 합성 완료 (비율 유지)');
-                } else {
-                    console.warn('[AR] 워터마크 이미지가 준비되지 않아 텍스트로 보완');
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-                    ctx.font = 'bold 30px sans-serif';
-                    ctx.fillText('LOGO', canvas.width - 150, canvas.height - 50);
-                }
-
-                // 최후의 데이터를 Blob으로 변환 (JPEG 85%로 용량 축소)
-                canvas.toBlob((blob) => {
-                    if (blob) {
-                        lastCapturedBlob = blob;
-                        console.log('[AR] 캡처 Blob 크기:', (blob.size / 1024).toFixed(0) + 'KB');
-
-                        // 다운로드 버튼 활성화
-                        const downloadBtn = document.getElementById('btn-download');
-                        downloadBtn.style.opacity = '1';
-                        downloadBtn.style.pointerEvents = 'auto';
-
-                        showToast('촬영 완료! 저장 버튼을 누르세요.');
-                    } else {
-                        console.error('[AR] Blob 생성 실패');
-                        showToast('캡처 실패 (Canvas 오류)');
-                    }
-                }, 'image/jpeg', 0.85);
-
-            } catch (err) {
-                console.error('[AR] 캡처 중 치명적 오류:', err);
-                alert('캡처 중 오류가 발생했습니다: ' + err.message);
-            }
-        }
-
-        // object-fit: cover 방식으로 비디오를 캔버스에 그리기
-        function drawVideoCover(ctx, video, canvasWidth, canvasHeight, mirror = false) {
-            const videoWidth = video.videoWidth;
-            const videoHeight = video.videoHeight;
-            if (videoWidth === 0 || videoHeight === 0) return;
-
-            const videoRatio = videoWidth / videoHeight;
-            const canvasRatio = canvasWidth / canvasHeight;
-
-            let sx, sy, sWidth, sHeight;
-
-            if (videoRatio > canvasRatio) {
-                sHeight = videoHeight;
-                sWidth = videoHeight * canvasRatio;
-                sx = (videoWidth - sWidth) / 2;
-                sy = 0;
-            } else {
-                sWidth = videoWidth;
-                sHeight = videoWidth / canvasRatio;
-                sx = 0;
-                sy = (videoHeight - sHeight) / 2;
-            }
-
-            if (mirror) {
-                ctx.save();
-                ctx.scale(-1, 1);
-                ctx.drawImage(video, sx, sy, sWidth, sHeight, -canvasWidth, 0, canvasWidth, canvasHeight);
-                ctx.restore();
-            } else {
-                ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, canvasWidth, canvasHeight);
-            }
-        }
-
-        // === 다운로드 ===
-        async function downloadCapture() {
-            if (!lastCapturedBlob) {
-                showToast('먼저 촬영(동그란 버튼)을 해주세요!');
-                return;
-            }
-
-            showToast('저장 중...');
-
-            try {
-                await _saveToGallery(lastCapturedBlob);
-                showToast('갤러리에 저장되었습니다');
-            } catch (err) {
-                var errMsg = err && err.message ? err.message : String(err);
-                console.error('[AR] 저장 실패:', errMsg);
-                showToast('저장 실패: ' + errMsg);
-            }
         }
 
         // === 리사이즈 ===
@@ -659,15 +411,6 @@
         function showHint() {
             const hint = document.getElementById('hint-overlay');
             hint.classList.add('visible');
-        }
-
-        function showToast(message) {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.classList.add('visible');
-            setTimeout(() => {
-                toast.classList.remove('visible');
-            }, 2000);
         }
 
         // === 렌더 루프 ===

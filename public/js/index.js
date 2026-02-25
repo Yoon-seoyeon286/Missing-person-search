@@ -14,7 +14,6 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
             const uploadArea = document.getElementById('upload-area');
             const fileInput = document.getElementById('file-input');
             const galleryBtn = document.getElementById('gallery-btn');
-            const cameraBtn = document.getElementById('camera-btn');
             const previewContainer = document.getElementById('preview-container');
             const previewImage = document.getElementById('preview-image');
             const previewInfo = document.getElementById('preview-info');
@@ -31,12 +30,6 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
             // 갤러리 버튼
             galleryBtn.onclick = () => {
                 fileInput.removeAttribute('capture');
-                fileInput.click();
-            };
-
-            // 카메라 버튼
-            cameraBtn.onclick = () => {
-                fileInput.setAttribute('capture', 'environment');
                 fileInput.click();
             };
 
