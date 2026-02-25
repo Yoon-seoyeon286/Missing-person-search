@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git rm:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm start)",
+      "Bash(npx webpack serve --mode development --port 3000)",
+      "Bash(findstr:*)",
+      "Bash(copy:*)",
+      "Bash(ipconfig:*)",
+      "Bash(xcopy:*)",
+      "Bash(timeout 5 node:*)",
+      "Bash(netsh advfirewall firewall show rule:*)",
+      "Bash(netsh advfirewall firewall add rule:*)",
+      "Bash(curl:*)",
+      "Bash(ait deploy --help:*)",
+      "Bash(ait --help:*)",
+      "Bash(npx ait deploy:*)",
+      "Bash(npx granite --help:*)",
+      "Bash(npx granite build:*)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\panop\\Desktop\\works\\tossinapp-ar\\ar-vision\\public"
+    ]
+  }
+}
