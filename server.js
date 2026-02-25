@@ -1,21 +1,22 @@
-const express = require('express');
+const express = require('express'); // Node.js 런타임 환경에서 구동되는 웹 프레임워크
 const path = require('path');
-const fs = require('fs');
-const multer = require('multer');
-const { v4: uuidv4 } = require('uuid');
+const fs = require('fs'); //파일을 만들거나 읽는 도구
+const multer = require('multer'); // 사용자가 보낸 이미지 파일을 해석해서 저장
+const { v4: uuidv4 } = require('uuid'); //랜덤한 고유 이름 만드는 도구 
 
-const app = express();
+const app = express(); //서버 객체
 const PORT = process.env.PORT || 3000;
 
-// ── 업로드 디렉토리 ──────────────────────────────────────────
-// 납품 시 이 경로를 S3 / 클라우드 스토리지로 교체하세요.
+// [저장소 준비]
+// 로컬 파일 시스템
+// 이 경로를 S3 / 클라우드 스토리지로 교체.
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
     fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 
-// ── multer 설정 ─────────────────────────────────────────────
-// 파일명 = UUID.png  → 고유 ID가 곧 파일명
+// [multer 설정]
+// 파일명 = UUID.png 
 const storage = multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
     filename: (_req, _file, cb) => cb(null, uuidv4() + '.png'),
