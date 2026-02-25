@@ -214,57 +214,28 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
                 }
             }
 
-            // IndexedDB 헬퍼 함수
-            function openImageDB() {
-                return new Promise((resolve, reject) => {
-                    const request = indexedDB.open('ARImageDB', 1);
-                    request.onerror = () => reject(request.error);
-                    request.onsuccess = () => resolve(request.result);
-                    request.onupgradeneeded = (e) => {
-                        const db = e.target.result;
-                        if (!db.objectStoreNames.contains('images')) {
-                            db.createObjectStore('images', { keyPath: 'id' });
-                        }
-                    };
-                });
-            }
-
-            async function saveImageToDB(blob) {
-                const db = await openImageDB();
-                return new Promise((resolve, reject) => {
-                    const tx = db.transaction('images', 'readwrite');
-                    const store = tx.objectStore('images');
-                    store.put({ id: 'arImage', blob: blob });
-                    tx.oncomplete = () => {
-                        db.close();
-                        resolve();
-                    };
-                    tx.onerror = () => {
-                        db.close();
-                        reject(tx.error);
-                    };
-                });
-            }
-
-            // AR로 이동 함수
+            // AR로 이동 함수 — 서버에 업로드 후 공유 URL로 이동
             async function goToAR() {
                 console.log('[Upload] goToAR 호출됨, processedImageBlob:', !!processedImageBlob);
 
                 if (!processedImageBlob) {
-                    console.log('[Upload] processedImageBlob이 없음');
                     alert('먼저 이미지를 업로드하고 배경 제거를 완료해주세요.');
                     return;
                 }
 
                 try {
-                    arButton.querySelector('span').textContent = '로딩 중...';
+                    arButton.querySelector('span').textContent = '업로드 중...';
                     arButton.style.pointerEvents = 'none';
 
-                    // IndexedDB에 Blob 직접 저장 (용량 제한 없음)
-                    await saveImageToDB(processedImageBlob);
+                    const formData = new FormData();
+                    formData.append('image', processedImageBlob, 'image.png');
 
-                    console.log('[Upload] 이미지 저장 완료, AR 페이지로 이동');
-                    window.location.href = 'ar.html';
+                    const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                    if (!res.ok) throw new Error(`서버 오류 (${res.status})`);
+                    const { id } = await res.json();
+
+                    console.log('[Upload] 업로드 완료, id:', id);
+                    window.location.href = `ar.html?id=${id}`;
 
                 } catch (err) {
                     console.error('[Upload] AR 이동 실패:', err);

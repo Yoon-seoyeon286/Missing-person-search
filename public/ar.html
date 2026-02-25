@@ -47,11 +47,20 @@
     <!-- 터치 영역 -->
     <div id="touch-area"></div>
 
+    <!-- 링크 복사 토스트 -->
+    <div class="toast" id="toast">링크가 복사되었습니다</div>
+
     <!-- 상단 UI -->
     <div class="top-ui">
         <button class="btn-icon" id="btn-back" title="뒤로가기">
             <svg viewBox="0 0 24 24">
                 <polyline points="15 18 9 12 15 6" />
+            </svg>
+        </button>
+        <button class="btn-icon" id="btn-copy-link" title="링크 복사">
+            <svg viewBox="0 0 24 24">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
             </svg>
         </button>
     </div>
