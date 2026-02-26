@@ -70,10 +70,21 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
 
 // [메뉴 1-2: 합성 이미지 생성]
 // POST /api/composite  multipart { face: File, outfit?: File, height, weight, age, outfitText? }
-app.post('/api/composite', compositeUpload.fields([
+const compositeFields = compositeUpload.fields([
     { name: 'face', maxCount: 1 },
     { name: 'outfit', maxCount: 1 },
-]), async (req, res) => {
+]);
+
+app.post('/api/composite', (req, res, next) => {
+    console.log('[Composite] 요청 수신');
+    compositeFields(req, res, (err) => {
+        if (err) {
+            console.error('[Composite] multer 오류:', err);
+            return res.status(400).json({ error: err.message });
+        }
+        next();
+    });
+}, async (req, res) => {
     const { height, weight, age, outfitText } = req.body;
     const faceFile = req.files?.face?.[0];
 
@@ -84,26 +95,55 @@ app.post('/api/composite', compositeUpload.fields([
 
     const outfit = outfitText || 'casual clothes';
     const prompt = `Full body photo of a Korean person, ${bodyDesc}, wearing ${outfit}, standing straight facing forward, plain white background, photorealistic, high quality`;
+    console.log('[Composite] 프롬프트:', prompt);
 
     try {
         // 1단계: 전신 이미지 생성
         console.log('[Composite] 1단계: 전신 생성 중...');
-        const fluxOutput = await replicate.run('black-forest-labs/flux-dev', {
-            input: { prompt, num_outputs: 1, aspect_ratio: '2:3' },
-        });
-        const bodyImageUrl = Array.isArray(fluxOutput) ? fluxOutput[0] : fluxOutput;
+        let fluxOutput;
+        try {
+            fluxOutput = await replicate.run('black-forest-labs/flux-schnell', {
+                input: { prompt, num_outputs: 1, aspect_ratio: '2:3' },
+            });
+        } catch (e) {
+            console.error('[Composite] flux-dev 오류:', e);
+            return res.status(500).json({ error: '전신 이미지 생성 실패: ' + (e?.message || String(e)) });
+        }
+        console.log('[Composite] flux 출력 타입:', typeof fluxOutput, Array.isArray(fluxOutput), fluxOutput);
+        const bodyImageRaw = Array.isArray(fluxOutput) ? fluxOutput[0] : fluxOutput;
+        const bodyImageUrl = String(bodyImageRaw);
+        console.log('[Composite] 전신 URL:', bodyImageUrl);
 
-        // 2단계: 얼굴 합성
+        // 2단계: 얼굴 합성 (429 rate limit 시 최대 3회 재시도)
         console.log('[Composite] 2단계: 얼굴 합성 중...');
         const faceBase64 = `data:${faceFile.mimetype};base64,${faceFile.buffer.toString('base64')}`;
-        const swapOutput = await replicate.run('yan-foto/face-swap', {
-            input: { swap_image: faceBase64, base_image: bodyImageUrl.toString() },
-        });
-        const resultUrl = swapOutput.toString();
+        let swapOutput;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                swapOutput = await replicate.run(
+                    'codeplugtech/face-swap:278a81e7ebb22db98bcba54de985d22cc1abeead2754eb1f2af717247be69b34',
+                    { input: { input_image: bodyImageUrl, swap_image: faceBase64 } }
+                );
+                break; // 성공 시 루프 종료
+            } catch (e) {
+                const is429 = e?.message?.includes('429') || e?.status === 429;
+                if (is429 && attempt < 3) {
+                    console.log(`[Composite] face-swap 429 rate limit, ${attempt}회 재시도 대기 중...`);
+                    await new Promise(r => setTimeout(r, 8000));
+                    continue;
+                }
+                console.error('[Composite] face-swap 오류:', e);
+                return res.status(500).json({ error: '얼굴 합성 실패: ' + (e?.message || String(e)) });
+            }
+        }
+        console.log('[Composite] face-swap 출력:', typeof swapOutput, swapOutput);
+        const resultUrl = String(swapOutput);
+        console.log('[Composite] 결과 URL:', resultUrl);
 
         // 3단계: 결과 저장
         console.log('[Composite] 3단계: 결과 저장 중...');
         const imgRes = await fetch(resultUrl);
+        if (!imgRes.ok) throw new Error(`이미지 다운로드 실패 (${imgRes.status})`);
         const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
         const id = uuidv4();
         fs.writeFileSync(path.join(UPLOADS_DIR, id + '.png'), imgBuffer);
@@ -112,8 +152,10 @@ app.post('/api/composite', compositeUpload.fields([
         res.json({ id, url: `${baseUrl}/ar.html?id=${id}` });
 
     } catch (err) {
-        console.error('[Composite] 오류:', err);
-        res.status(500).json({ error: '합성 실패: ' + err.message });
+        console.error('[Composite] 예상치 못한 오류:', err);
+        if (!res.headersSent) {
+            res.status(500).json({ error: '합성 실패: ' + (err?.message || String(err)) });
+        }
     }
 });
 
@@ -158,6 +200,12 @@ function buildBodyDescription(height, weight, age) {
     const ageStr    = a < 13 ? 'child' : a < 20 ? 'teenager' : a < 30 ? 'young adult in 20s' : a < 40 ? 'adult in 30s' : a < 50 ? 'adult in 40s' : a < 60 ? 'middle-aged' : a < 70 ? 'older adult' : 'elderly person';
     return `${ageStr}, ${heightStr}, ${h}cm tall, ${w}kg, ${buildStr}`;
 }
+
+// 전역 에러 핸들러 (multer 오류 등 미들웨어 오류 → JSON 반환)
+app.use((err, _req, res, _next) => {
+    console.error('[Express 오류]', err);
+    res.status(err.status || 500).json({ error: err.message || '서버 오류' });
+});
 
 //서버 시작
 app.listen(PORT, () => {

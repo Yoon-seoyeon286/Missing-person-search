@@ -1,3 +1,5 @@
+import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.1/+esm';
+
 document.addEventListener('DOMContentLoaded', () => {
 
     // 뒤로 가기
@@ -88,31 +90,58 @@ document.addEventListener('DOMContentLoaded', () => {
         btnComposite.textContent = '합성 중... (약 30~60초)';
 
         try {
+            // 1단계: AI 합성
+            btnComposite.textContent = '합성 중... (약 30~60초)';
             const res = await fetch('/api/composite', { method: 'POST', body: formData });
             if (!res.ok) {
                 const { error } = await res.json();
+                const isNoCredit = error && (error.includes('402') || error.includes('Insufficient credit') || error.includes('insufficient credit'));
+                if (isNoCredit) {
+                    throw new Error('AI 크레딧이 부족합니다.\nReplicate 계정에 크레딧을 충전해주세요.\nhttps://replicate.com/account/billing');
+                }
                 throw new Error(error);
             }
-            const { id } = await res.json();
-            window.location.href = `ar.html?id=${id}`;
+            const { id: compositeId } = await res.json();
+
+            // 2단계: 누끼 따기
+            btnComposite.textContent = '누끼 따는 중...';
+            const imgRes = await fetch(`/api/image/${compositeId}`);
+            const rawBlob = await imgRes.blob();
+            const removedBlob = await removeBackground(rawBlob, {
+                model: 'medium',
+                output: { format: 'image/png', quality: 0.9 },
+            });
+
+            // 3단계: 업로드 → 링크 생성
+            btnComposite.textContent = '링크 생성 중...';
+            const uploadForm = new FormData();
+            uploadForm.append('image', removedBlob, 'image.png');
+            const uploadRes = await fetch('/api/upload', { method: 'POST', body: uploadForm });
+            if (!uploadRes.ok) throw new Error(`업로드 오류 (${uploadRes.status})`);
+            const { id } = await uploadRes.json();
+
+            const arUrl = `${location.origin}/ar.html?id=${id}`;
+
+            // 결과 화면 표시
+            document.getElementById('result-img').src = `/api/image/${id}`;
+            document.getElementById('btn-ar').href = arUrl;
+            document.getElementById('btn-copy-link').onclick = () => {
+                navigator.clipboard.writeText(arUrl).then(() => {
+                    const toast = document.getElementById('toast');
+                    toast.classList.add('show');
+                    setTimeout(() => toast.classList.remove('show'), 2000);
+                });
+            };
+            document.getElementById('result-section').classList.add('visible');
+            btnComposite.disabled = false;
+            btnComposite.innerHTML = `<svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>다시 합성`;
+
         } catch (err) {
             alert('오류: ' + err.message);
             btnComposite.disabled = false;
-            btnComposite.textContent = '합성 시작';
+            btnComposite.innerHTML = `<svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>합성 시작`;
         }
     };
 
 });
 
-// height: cm, weight: kg, age: 세 → 영문 프롬프트 문자열 반환
-function buildBodyDescription(height, weight, age) {
-    const h = Number(height), w = Number(weight), a = Number(age);
-    if (!h || !w || !a) return null;
-
-    const bmi = w / ((h / 100) ** 2);
-    const heightStr = h < 155 ? 'short' : h < 163 ? 'below average height' : h < 172 ? 'average height' : h < 180 ? 'tall' : 'very tall';
-    const buildStr  = bmi < 17 ? 'very thin build' : bmi < 20 ? 'slim build' : bmi < 23 ? 'average build' : bmi < 25 ? 'slightly stocky build' : bmi < 28 ? 'stocky build' : 'heavy build';
-    const ageStr    = a < 13 ? 'child' : a < 20 ? 'teenager' : a < 30 ? 'young adult in 20s' : a < 40 ? 'adult in 30s' : a < 50 ? 'adult in 40s' : a < 60 ? 'middle-aged' : a < 70 ? 'older adult' : 'elderly person';
-
-    return `${ageStr}, ${heightStr}, ${h}cm tall, ${w}kg, ${buildStr}`;
-}

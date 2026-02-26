@@ -209,45 +209,39 @@
             text-align: center;
         }
 
-        #ar-button {
-            margin-top: 30px;
+        .result-links {
+            margin-top: 20px;
             width: 100%;
             max-width: 400px;
-            padding: 20px;
-            background: #0054a6;
-            border: none;
-            border-radius: 50px;
-            color: #ffffff;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
             display: none;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            box-shadow: 0 4px 30px rgba(0, 84, 166, 0.4);
-            transition: all 0.3s ease;
-            position: relative;
-            z-index: 100;
-            -webkit-tap-highlight-color: transparent;
-            touch-action: manipulation;
+            flex-direction: column;
+            gap: 12px;
         }
 
-        #ar-button.visible {
+        .result-links.visible {
             display: flex;
         }
 
-        #ar-button:active {
-            transform: scale(0.98);
-            background: #003d7a;
+        .toast {
+            position: fixed;
+            bottom: 32px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: rgba(26, 45, 69, 0.9);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: 500;
+            opacity: 0;
+            transition: all 0.3s;
+            pointer-events: none;
+            white-space: nowrap;
         }
 
-        #ar-button svg {
-            width: 24px;
-            height: 24px;
-            stroke: #ffffff;
-            fill: none;
-            stroke-width: 2;
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
         }
 
         .result-container {

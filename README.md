@@ -3,17 +3,32 @@
 실종자 사진에서 배경을 자동으로 제거하고,
 카메라로 AR(증강현실) 확인이 가능한 **공유 링크**를 생성하는 웹 애플리케이션입니다.
 
+AI 합성 기능으로 얼굴 사진 + 신체 정보 + 옷차림만으로 전신 이미지를 생성할 수도 있습니다.
+
 ---
 
 ## 사용 흐름
 
+### A. 전신 사진 올리기 (기존 사진 활용)
+
 ```
-1. 실종자 사진 업로드 (갤러리에서 선택)
-2. AI가 자동으로 배경 제거 (브라우저에서 처리, 서버 전송 없음)
-3. [AR로 보기] 클릭
-4. 서버에 이미지 저장 → 고유 UUID 발급
+1. [전신 사진 올리기] 선택
+2. 갤러리에서 전신 사진 선택
+3. AI가 자동으로 배경 제거 (브라우저에서 처리, 서버 전송 없음)
+4. [AR로 보기] 클릭 → 서버에 이미지 저장 → 고유 UUID 발급
 5. ar.html?id=UUID 로 이동 — 이 URL 자체가 공유 링크
 6. 링크 버튼으로 URL 복사 후 공유 → 누구든 카메라로 AR 확인 가능
+```
+
+### B. AI 합성하기 (전신 사진이 없을 때)
+
+```
+1. [합성하기] 선택
+2. 키 / 몸무게 / 나이 입력
+3. 얼굴 사진 업로드
+4. 옷차림 입력 (텍스트 또는 사진)
+5. [합성 시작] → AI가 전신 이미지 생성 + 얼굴 합성 (30~60초)
+6. ar.html?id=UUID 로 자동 이동 → AR 공유 링크 사용
 ```
 
 ---
@@ -28,6 +43,8 @@
 | 파일 업로드 | multer 2.x | |
 | 고유 ID | uuid v4 | |
 | 파일 저장 | 로컬 디스크 (`uploads/`) | ⚠️ 운영 환경에서는 클라우드로 교체 권장 |
+| AI 전신 생성 | Replicate — `flux-schnell` | 유료 API (크레딧 선불 충전) |
+| AI 얼굴 합성 | Replicate — `codeplugtech/face-swap` | 유료 API (크레딧 선불 충전) |
 
 ---
 
@@ -37,6 +54,18 @@
 
 - Node.js 18 이상
 - **HTTPS 환경 필수** — 카메라 API는 보안 컨텍스트(HTTPS)에서만 동작합니다
+- Replicate API 토큰 (합성 기능 사용 시)
+
+### 환경변수 설정
+
+프로젝트 루트에 `.env` 파일 생성:
+
+```bash
+PORT=3000
+REPLICATE_API_TOKEN=r8_xxxxxxxxxxxxxxxxxxxx
+```
+
+Replicate 토큰 발급: https://replicate.com/account/api-tokens
 
 ### 설치
 
@@ -53,9 +82,8 @@ npm start
 ```
 
 기본 포트: `3000`
-포트 변경: `PORT=8080 node server.js`
-
 로컬 개발 시: `http://localhost:3000`
+⚠️ Live Server (VS Code)로 열지 말 것 — API 요청이 Node.js 서버로 가지 않아 동작하지 않습니다.
 
 ---
 
@@ -80,6 +108,28 @@ npm start
 }
 ```
 
+### `POST /api/composite`
+
+얼굴 사진 + 신체 정보로 AI 전신 이미지를 합성합니다.
+
+| 항목 | 내용 |
+|------|------|
+| Content-Type | `multipart/form-data` |
+| `face` | 얼굴 사진 (필수) |
+| `outfit` | 옷차림 사진 (선택, `outfitText`와 택1) |
+| `outfitText` | 옷차림 텍스트 (선택, `outfit`과 택1) |
+| `height` | 키 (cm) |
+| `weight` | 몸무게 (kg) |
+| `age` | 나이 |
+
+**응답 예시**
+```json
+{
+  "id": "b5e3d9f2-1c6a-4d8b-9e2f-abcdef123456",
+  "url": "https://yourdomain.com/ar.html?id=b5e3d9f2-1c6a-4d8b-9e2f-abcdef123456"
+}
+```
+
 ### `GET /api/image/:id`
 
 저장된 이미지를 반환합니다. (UUID 형식만 허용, path traversal 방지 처리됨)
@@ -95,13 +145,16 @@ npm start
 ├── .env                   # 환경변수 (git 제외, 직접 생성 필요)
 ├── uploads/               # 업로드된 이미지 저장 (git 제외)
 └── public/
-    ├── index.html         # 메인 페이지 (업로드 + 배경 제거)
+    ├── index.html         # 메인 페이지 (전신 사진 올리기 / 합성하기 선택)
+    ├── composite.html     # AI 합성 입력 폼
     ├── ar.html            # AR 뷰어 + 링크 복사 버튼
     ├── css/
     │   ├── index.css
+    │   ├── composite.css
     │   └── ar.css
     └── js/
         ├── index.js       # 배경 제거 + 서버 업로드 로직
+        ├── composite.js   # AI 합성 폼 + API 호출
         └── ar.js          # Three.js AR + URL 파라미터 이미지 로드
 ```
 
@@ -121,7 +174,25 @@ npm start
 방법 C: AWS ALB / Load Balancer SSL 처리
 ```
 
-#### 2. 서버 상시 실행 유지
+#### 2. Replicate 크레딧 충전 (합성 기능 사용 시)
+
+합성 기능은 Replicate AI API를 사용하며, **선불 크레딧** 방식입니다.
+
+- 충전 URL: https://replicate.com/account/billing
+- 월정액 아님 — 크레딧 소진 시 자동 중단 (추가 청구 없음)
+- 자동 재충전 설정 가능
+
+**합성 1회 예상 비용**
+
+| 모델 | 역할 | 비용 |
+|------|------|------|
+| flux-schnell | 전신 이미지 생성 | ~$0.003 |
+| codeplugtech/face-swap | 얼굴 합성 | ~$0.003 |
+| **합계** | | **~$0.006 (약 9원)** |
+
+$5 충전 시 약 800회 합성 가능.
+
+#### 3. 서버 상시 실행 유지
 
 서버가 꺼지면 공유 링크가 동작하지 않습니다. PM2 등으로 항상 실행 상태를 유지하세요.
 
@@ -132,7 +203,7 @@ pm2 save
 pm2 startup   # 서버 재시작 시 자동 실행
 ```
 
-#### 3. `uploads/` 디렉토리 용량 관리
+#### 4. `uploads/` 디렉토리 용량 관리
 
 이미지가 누적됩니다. 오래된 파일을 주기적으로 삭제하는 정책이 필요합니다.
 
@@ -145,7 +216,7 @@ find /path/to/uploads -mtime +30 -name "*.png" -delete
 
 ### ⚙️ 권장 (운영 환경)
 
-#### 4. 파일 저장소를 클라우드로 교체
+#### 5. 파일 저장소를 클라우드로 교체
 
 현재는 로컬 디스크(`uploads/`)에 저장합니다.
 서버가 재배포되거나 여러 대로 늘어날 경우 파일이 유실될 수 있습니다.
@@ -161,31 +232,10 @@ find /path/to/uploads -mtime +30 -name "*.png" -delete
 - `POST /api/upload` — `multer.diskStorage` → `multer.memoryStorage` + 클라우드 SDK 업로드
 - `GET /api/image/:id` — `res.sendFile` → 클라우드 URL 리다이렉트 또는 스트림
 
-#### 5. 이미지 만료 정책 구현
+#### 6. 이미지 만료 정책 구현
 
 현재 업로드된 이미지는 영구 보관됩니다.
 DB에 업로드 시각을 저장하고 N일 후 자동 삭제하는 로직을 추가하세요.
-
-```sql
--- 예시 테이블
-CREATE TABLE uploads (
-  id UUID PRIMARY KEY,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-#### 6. 환경변수 분리
-
-`.env` 파일을 생성하여 설정값을 관리하세요. (`.gitignore`에 이미 포함되어 있음)
-
-```bash
-# .env
-PORT=3000
-
-# 향후 AI 기능 추가 시
-OPENAI_API_KEY=sk-...
-REPLICATE_API_TOKEN=r8_...
-```
 
 ---
 
@@ -202,7 +252,7 @@ REPLICATE_API_TOKEN=r8_...
 npm install express-rate-limit
 ```
 
-`POST /api/upload`에 rate limiting을 적용하면 의도치 않은 대량 업로드를 방지할 수 있습니다.
+`POST /api/upload`, `POST /api/composite`에 rate limiting을 적용하면 의도치 않은 대량 요청을 방지할 수 있습니다.
 
 ---
 
@@ -214,9 +264,5 @@ npm install express-rate-limit
 | 이미지 만료 | 없음 (영구 보관) | 크론잡 + DB 기록 추가 |
 | 접근 인증 | 없음 | API Key 또는 JWT 추가 |
 | 스케일 아웃 | 단일 서버만 지원 | 공유 스토리지 적용 후 다중 서버 가능 |
-| 이미지 크기 제한 | 15MB | `server.js` `fileSize` 값 수정 |
-| AI 전신 합성 | 미구현 | OpenAI gpt-image-1 + face swap API 연동 예정 |
-
----
-
-
+| 이미지 크기 제한 | 15MB (업로드) / 10MB (합성) | `server.js` `fileSize` 값 수정 |
+| AI 합성 비용 | 회당 약 $0.006 | Replicate 크레딧 선불 충전 필요 |

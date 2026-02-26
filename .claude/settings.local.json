@@ -20,7 +20,9 @@
       "Bash(npx granite build:*)",
       "Bash(wc -l /c/Users/panop/Desktop/works/Missing-person-search/public/css/*.css /c/Users/panop/Desktop/works/Missing-person-search/public/js/*.js)",
       "Bash(grep -n \"#7C\\\\|#8B\\\\|#68\\\\|#2d5a\\\\|#2d3a\\\\|1a2e\\\\|0f1f\\\\|124, 179\\\\|26, 46\\\\|45, 58\\\\|e8f5\\\\|d0e8\\\\|f8fb\\\\|C8E6\" /c/Users/panop/Desktop/works/Missing-person-search/public/css/*.css)",
-      "Bash(node -e \"const m = require\\(''multer''\\); console.log\\(''multer version:'', require\\(''./node_modules/multer/package.json''\\).version\\)\")"
+      "Bash(node -e \"const m = require\\(''multer''\\); console.log\\(''multer version:'', require\\(''./node_modules/multer/package.json''\\).version\\)\")",
+      "WebFetch(domain:replicate.com)",
+      "WebFetch(domain:www.aimodels.fyi)"
     ],
     "additionalDirectories": [
       "c:\\Users\\panop\\Desktop\\works\\tossinapp-ar\\ar-vision\\public"

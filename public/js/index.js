@@ -23,10 +23,11 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
             const progressText = document.getElementById('progress-text');
             const resultContainer = document.getElementById('result-container');
             const resultImage = document.getElementById('result-image');
-            const arButton = document.getElementById('ar-button');
+            const resultLinks = document.getElementById('result-links');
+            const btnArLink   = document.getElementById('btn-ar-link');
+            const btnCopyIdx  = document.getElementById('btn-copy-idx');
+            const toast       = document.getElementById('toast');
             const errorMessage = document.getElementById('error-message');
-
-            console.log('[Upload] 요소 참조:', { arButton: !!arButton });
 
             // 합성하기 버튼
             document.getElementById('composite-btn').onclick = () => {
@@ -43,13 +44,6 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
             fileInput.onchange = (e) => {
                 const file = e.target.files[0];
                 if (file) handleFile(file);
-            };
-
-            // AR 버튼 클릭
-            arButton.onclick = function(e) {
-                e.preventDefault();
-                console.log('[Upload] AR 버튼 onclick 발생');
-                goToAR();
             };
 
             // 파일 처리
@@ -142,7 +136,7 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
             async function processImage(file) {
                 progressContainer.classList.add('visible');
                 resultContainer.classList.remove('visible');
-                arButton.classList.remove('visible');
+                resultLinks.classList.remove('visible');
                 progressFill.style.width = '0%';
                 progressText.textContent = '모델 로딩 중...';
 
@@ -171,22 +165,12 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
                     progressFill.style.width = '95%';
                     processedImageBlob = await chokeAlpha(rawBlob, 1);
 
-                    progressFill.style.width = '100%';
-                    progressText.textContent = '완료!';
-
                     const resultURL = URL.createObjectURL(processedImageBlob);
                     resultImage.src = resultURL;
                     resultContainer.classList.add('visible');
 
-                    // 카메라로 보는 버튼 표시
-                    arButton.classList.add('visible');
-                    console.log('[Upload] 카메라 열기 버튼 표시됨, visible 클래스:', arButton.classList.contains('visible'));
-
-                    setTimeout(() => {
-                        progressContainer.classList.remove('visible');
-                    }, 1000);
-
-                    console.log('[Upload] 배경 제거 완료, processedImageBlob:', !!processedImageBlob);
+                    // 자동 업로드 → 링크 생성
+                    await generateLink();
 
                 } catch (error) {
                     console.error('[Upload] 처리 실패:', error);
@@ -195,19 +179,12 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
                 }
             }
 
-            // AR로 이동 함수 — 서버에 업로드 후 공유 URL로 이동
-            async function goToAR() {
-                console.log('[Upload] goToAR 호출됨, processedImageBlob:', !!processedImageBlob);
-
-                if (!processedImageBlob) {
-                    alert('먼저 이미지를 업로드하고 배경 제거를 완료해주세요.');
-                    return;
-                }
+            // 업로드 후 링크 생성
+            async function generateLink() {
+                progressFill.style.width = '100%';
+                progressText.textContent = '링크 생성 중...';
 
                 try {
-                    arButton.querySelector('span').textContent = '업로드 중...';
-                    arButton.style.pointerEvents = 'none';
-
                     const formData = new FormData();
                     formData.append('image', processedImageBlob, 'image.png');
 
@@ -215,14 +192,22 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
                     if (!res.ok) throw new Error(`서버 오류 (${res.status})`);
                     const { id } = await res.json();
 
-                    console.log('[Upload] 업로드 완료, id:', id);
-                    window.location.href = `ar.html?id=${id}`;
+                    const arUrl = `${location.origin}/ar.html?id=${id}`;
+                    btnArLink.href = arUrl;
+                    btnCopyIdx.onclick = () => {
+                        navigator.clipboard.writeText(arUrl).then(() => {
+                            toast.classList.add('show');
+                            setTimeout(() => toast.classList.remove('show'), 2000);
+                        });
+                    };
+                    resultLinks.classList.add('visible');
+
+                    setTimeout(() => progressContainer.classList.remove('visible'), 800);
 
                 } catch (err) {
-                    console.error('[Upload] AR 이동 실패:', err);
-                    alert('오류가 발생했습니다: ' + err.message);
-                    arButton.querySelector('span').textContent = 'AR로 보기';
-                    arButton.style.pointerEvents = 'auto';
+                    console.error('[Upload] 링크 생성 실패:', err);
+                    showError('링크 생성에 실패했습니다: ' + err.message);
+                    progressContainer.classList.remove('visible');
                 }
             }
 
