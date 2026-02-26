@@ -71,7 +71,7 @@
             }
         }
 
-        // === 카메라 초기화 (후면 고정) ===
+        // 카메라 초기화 (후면)
         async function initCamera() {
             video = document.getElementById('video-background');
             if (!video) throw new Error('비디오 요소를 찾을 수 없습니다.');
@@ -130,7 +130,7 @@
             }
         }
 
-        // === 캔버스 초기화 ===
+        // 캔버스 초기화
         function initCanvas() {
             canvas = document.getElementById('overlay-canvas');
             ctx = canvas.getContext('2d');
@@ -144,7 +144,7 @@
             console.log('캔버스 초기화 완료');
         }
 
-        // === 이미지 로딩 ===
+        // 이미지 로딩
         async function loadImageFromBlob(blob) {
             const objectURL = URL.createObjectURL(blob);
             try {
@@ -169,7 +169,7 @@
             });
         }
 
-        // === 이벤트 설정 ===
+        // 이벤트 설정
         function initEvents() {
             const touchArea = document.getElementById('touch-area');
 
@@ -177,14 +177,14 @@
             touchArea.addEventListener('touchstart', (e) => {
                 e.preventDefault();
                 if (!overlayImg) return;
-                if (e.touches.length === 1) {
+                if (e.touches.length === 1) { //손가락 1개면 이동 가능
                     gesture.isDragging = true;
                     gesture.isPinching = false;
                     gesture.dragStartX = e.touches[0].clientX;
                     gesture.dragStartY = e.touches[0].clientY;
                     gesture.objStartX = imgX;
                     gesture.objStartY = imgY;
-                } else if (e.touches.length === 2) {
+                } else if (e.touches.length === 2) { //손가락 2개면 확대 가능
                     gesture.isDragging = false;
                     gesture.isPinching = true;
                     gesture.pinchStartDist = getTouchDistance(e.touches);
@@ -278,7 +278,7 @@
             console.log('이벤트 설정 완료');
         }
 
-        // === 유틸리티 ===
+        // 유틸리티
         function getTouchDistance(touches) {
             const dx = touches[0].clientX - touches[1].clientX;
             const dy = touches[0].clientY - touches[1].clientY;
@@ -290,7 +290,7 @@
             canvas.height = window.innerHeight;
         }
 
-        // === UI 함수 ===
+        // UI 함수
         function updateLoading(text) {
             document.getElementById('loading-text').textContent = text;
         }
@@ -312,7 +312,7 @@
             setTimeout(() => toast.classList.remove('visible'), 2000);
         }
 
-        // === 렌더 루프 ===
+        // 렌더 루프
         function animate() {
             if (!isRunning) return;
             requestAnimationFrame(animate);
@@ -325,7 +325,7 @@
             ctx.drawImage(overlayImg, imgX - w / 2, imgY - h / 2, w, h);
         }
 
-        // === 시작 (iOS: 사용자 탭 후 init) ===
+        // 시작 (iOS: 사용자 탭 후 init)
         (function start() {
             const id = getImageId();
             if (!id) {
