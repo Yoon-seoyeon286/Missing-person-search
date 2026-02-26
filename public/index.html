@@ -42,6 +42,25 @@
             <p class="preview-info" id="preview-info"></p>
         </div>
 
+        <!-- 파일 선택 후 표시되는 액션 버튼 -->
+        <div class="action-group" id="action-group">
+            <button class="btn btn-primary" id="upload-btn">
+                <svg viewBox="0 0 24 24">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                업로드
+            </button>
+            <button class="btn btn-secondary" id="composite-btn">
+                <svg viewBox="0 0 24 24">
+                    <rect x="2" y="6" width="13" height="13" rx="2"/>
+                    <rect x="9" y="5" width="13" height="13" rx="2"/>
+                </svg>
+                합성하기
+            </button>
+        </div>
+
         <div class="progress-container" id="progress-container">
             <div class="progress-bar">
                 <div class="progress-fill" id="progress-fill"></div>

@@ -136,6 +136,18 @@
             background: rgba(0, 84, 166, 0.25);
         }
 
+        .action-group {
+            display: none;
+            gap: 15px;
+            margin-top: 20px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .action-group.visible {
+            display: flex;
+        }
+
         .preview-container {
             margin-top: 30px;
             width: 100%;

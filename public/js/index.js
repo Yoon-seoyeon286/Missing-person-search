@@ -3,6 +3,7 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
 
         // 처리된 이미지 Blob
         let processedImageBlob = null;
+        let selectedFile = null;
 
         // DOM 로드 후 실행
         document.addEventListener('DOMContentLoaded', () => {
@@ -19,6 +20,9 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
             const previewContainer = document.getElementById('preview-container');
             const previewImage = document.getElementById('preview-image');
             const previewInfo = document.getElementById('preview-info');
+            const actionGroup = document.getElementById('action-group');
+            const uploadBtn = document.getElementById('upload-btn');
+            const compositeBtn = document.getElementById('composite-btn');
             const progressContainer = document.getElementById('progress-container');
             const progressFill = document.getElementById('progress-fill');
             const progressText = document.getElementById('progress-text');
@@ -89,18 +93,29 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
 
                 hideError();
 
+                selectedFile = file;
+
                 // 원본 미리보기 표시
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     previewImage.src = e.target.result;
                     previewInfo.textContent = `${file.name} (${formatFileSize(file.size)})`;
                     previewContainer.classList.add('visible');
+                    actionGroup.classList.add('visible');
                 };
                 reader.readAsDataURL(file);
-
-                // 배경 제거 처리
-                await processImage(file);
             }
+
+            // 업로드 버튼 - 배경 제거 후 AR로 이동
+            uploadBtn.onclick = () => {
+                if (!selectedFile) return;
+                processImage(selectedFile);
+            };
+
+            // 합성하기 버튼 - 추후 구현
+            compositeBtn.onclick = () => {
+                alert('준비 중입니다.');
+            };
 
             // 테두리 정리 - 초크매트
             async function chokeAlpha(blob, amount = 2) {
