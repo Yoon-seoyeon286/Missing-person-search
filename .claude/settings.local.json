@@ -23,7 +23,9 @@
       "Bash(node -e \"const m = require\\(''multer''\\); console.log\\(''multer version:'', require\\(''./node_modules/multer/package.json''\\).version\\)\")",
       "WebFetch(domain:replicate.com)",
       "WebFetch(domain:www.aimodels.fyi)",
-      "WebFetch(domain:api.replicate.com)"
+      "WebFetch(domain:api.replicate.com)",
+      "Bash(git remote set-url origin https://github.com/Yoon-seoyeon286/Missing-person-search.git)",
+      "Bash(git add -A)"
     ],
     "additionalDirectories": [
       "c:\\Users\\panop\\Desktop\\works\\tossinapp-ar\\ar-vision\\public"

@@ -98,38 +98,50 @@ app.post('/api/composite', (req, res, next) => {
     console.log('[Composite] 프롬프트:', prompt);
 
     try {
-        // InstantID: 얼굴 참조해서 전신 한번에 생성
-        console.log('[Composite] InstantID 생성 중...');
-        const faceBase64 = `data:${faceFile.mimetype};base64,${faceFile.buffer.toString('base64')}`;
-        let instantOutput;
+        // 1단계: 전신 이미지 생성
+        console.log('[Composite] 1단계: 전신 생성 중...');
+        let fluxOutput;
         try {
-            instantOutput = await replicate.run(
-                'zsxkib/instant-id:c98b2e7a196828d00955767813b81fc05c5c9b294c670c6d147d545fed4ceecf',
-                {
-                    input: {
-                        image: faceBase64,
-                        prompt: `Full body photo of a Korean person, ${bodyDesc}, wearing ${outfit}, standing straight facing forward, plain white background, photorealistic, high quality`,
-                        negative_prompt: 'blurry, bad quality, distorted, cropped, watermark, multiple people',
-                        width: 768,
-                        height: 1152,
-                        num_inference_steps: 30,
-                        guidance_scale: 5,
-                        ip_adapter_scale: 0.8,
-                        controlnet_conditioning_scale: 0.8,
-                        disable_safety_checker: true,
-                    }
-                }
-            );
+            fluxOutput = await replicate.run('black-forest-labs/flux-dev', {
+                input: { prompt, num_outputs: 1, aspect_ratio: '2:3', num_inference_steps: 28 },
+            });
         } catch (e) {
-            console.error('[Composite] InstantID 오류:', e);
-            return res.status(500).json({ error: '합성 실패: ' + (e?.message || String(e)) });
+            console.error('[Composite] flux-dev 오류:', e);
+            return res.status(500).json({ error: '전신 이미지 생성 실패: ' + (e?.message || String(e)) });
         }
-        console.log('[Composite] InstantID 출력:', typeof instantOutput, instantOutput);
-        const resultUrl = Array.isArray(instantOutput) ? String(instantOutput[0]) : String(instantOutput);
+        console.log('[Composite] flux 출력 타입:', typeof fluxOutput, Array.isArray(fluxOutput), fluxOutput);
+        const bodyImageRaw = Array.isArray(fluxOutput) ? fluxOutput[0] : fluxOutput;
+        const bodyImageUrl = String(bodyImageRaw);
+        console.log('[Composite] 전신 URL:', bodyImageUrl);
+
+        // 2단계: 얼굴 합성 (429 rate limit 시 최대 3회 재시도)
+        console.log('[Composite] 2단계: 얼굴 합성 중...');
+        const faceBase64 = `data:${faceFile.mimetype};base64,${faceFile.buffer.toString('base64')}`;
+        let swapOutput;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                swapOutput = await replicate.run(
+                    'codeplugtech/face-swap:278a81e7ebb22db98bcba54de985d22cc1abeead2754eb1f2af717247be69b34',
+                    { input: { input_image: bodyImageUrl, swap_image: faceBase64 } }
+                );
+                break;
+            } catch (e) {
+                const is429 = e?.message?.includes('429') || e?.status === 429;
+                if (is429 && attempt < 3) {
+                    console.log(`[Composite] face-swap 429 rate limit, ${attempt}회 재시도 대기 중...`);
+                    await new Promise(r => setTimeout(r, 8000));
+                    continue;
+                }
+                console.error('[Composite] face-swap 오류:', e);
+                return res.status(500).json({ error: '얼굴 합성 실패: ' + (e?.message || String(e)) });
+            }
+        }
+        console.log('[Composite] face-swap 출력:', typeof swapOutput, swapOutput);
+        const resultUrl = String(swapOutput);
         console.log('[Composite] 결과 URL:', resultUrl);
 
-        // 결과 저장
-        console.log('[Composite] 결과 저장 중...');
+        // 3단계: 결과 저장
+        console.log('[Composite] 3단계: 결과 저장 중...');
         const imgRes = await fetch(resultUrl);
         if (!imgRes.ok) throw new Error(`이미지 다운로드 실패 (${imgRes.status})`);
         const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
