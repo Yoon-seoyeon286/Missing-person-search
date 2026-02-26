@@ -28,6 +28,11 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
 
             console.log('[Upload] 요소 참조:', { arButton: !!arButton });
 
+            // 합성하기 버튼
+            document.getElementById('composite-btn').onclick = () => {
+                window.location.href = 'composite.html';
+            };
+
             // 전신 사진 올리기 버튼
             uploadFullBtn.onclick = () => {
                 fileInput.removeAttribute('capture');
