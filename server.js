@@ -37,11 +37,10 @@ function setPermissionHeaders(res) {
     // 외부 도메인에서 API 호출이 필요한 경우 납품처에서 추가
 }
 
-// ── API: 이미지 업로드 ───────────────────────────────────────
+// [메뉴 1: 이미지 받기]
 // POST /api/upload  multipart/form-data { image: File }
-// → { id, url }
 //
-// [납품 교체 포인트]
+// *납품 교체 포인트
 //   - 현재: 로컬 파일시스템에 저장
 //   - 교체: S3.upload() / DB INSERT 후 presigned URL 반환
 app.post('/api/upload', upload.single('image'), (req, res) => {
@@ -56,10 +55,10 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
     });
 });
 
-// ── API: 이미지 조회 ─────────────────────────────────────────
+// [메뉴 2: 이미지 보여주기]
 // GET /api/image/:id
 //
-// [납품 교체 포인트]
+// *납품 교체 포인트
 //   - 현재: 로컬 파일 전송
 //   - 교체: S3 presigned URL redirect 또는 DB 조회 후 스트림 전송
 app.get('/api/image/:id', (req, res) => {
@@ -76,16 +75,18 @@ app.get('/api/image/:id', (req, res) => {
     res.sendFile(filePath);
 });
 
-// ── 정적 파일 (public/) ──────────────────────────────────────
+
 app.use(express.static(path.join(__dirname, 'public'), {
     setHeaders: (res) => setPermissionHeaders(res),
 }));
 
-// ── SPA 폴백 ─────────────────────────────────────────────────
+
 app.get('{*path}', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+
+//서버 시작
 app.listen(PORT, () => {
     console.log(`AR Vision server running on http://localhost:${PORT}`);
 });
