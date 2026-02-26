@@ -59,3 +59,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
 });
+
+// height: cm, weight: kg, age: 세 → 영문 프롬프트 문자열 반환
+function buildBodyDescription(height, weight, age) {
+    const h = Number(height), w = Number(weight), a = Number(age);
+    if (!h || !w || !a) return null;
+
+    const bmi = w / ((h / 100) ** 2);
+    const heightStr = h < 155 ? 'short' : h < 163 ? 'below average height' : h < 172 ? 'average height' : h < 180 ? 'tall' : 'very tall';
+    const buildStr  = bmi < 17 ? 'very thin build' : bmi < 20 ? 'slim build' : bmi < 23 ? 'average build' : bmi < 25 ? 'slightly stocky build' : bmi < 28 ? 'stocky build' : 'heavy build';
+    const ageStr    = a < 13 ? 'child' : a < 20 ? 'teenager' : a < 30 ? 'young adult in 20s' : a < 40 ? 'adult in 30s' : a < 50 ? 'adult in 40s' : a < 60 ? 'middle-aged' : a < 70 ? 'older adult' : 'elderly person';
+
+    return `${ageStr}, ${heightStr}, ${h}cm tall, ${w}kg, ${buildStr}`;
+}
