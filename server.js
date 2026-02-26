@@ -2,7 +2,7 @@ const express = require('express'); // Node.js 런타임 환경에서 구동되�
 const path = require('path');
 const fs = require('fs'); //파일을 만들거나 읽는 도구
 const multer = require('multer'); // 사용자가 보낸 이미지 파일을 해석해서 저장
-const { v4: uuidv4 } = require('uuid'); //랜덤한 고유 이름 만드는 도구 
+const { v4: uuidv4 } = require('uuid'); //랜덤한 이름 만들기 
 
 const app = express(); //서버 객체
 const PORT = process.env.PORT || 3000;
@@ -30,10 +30,11 @@ const upload = multer({
     },
 });
 
-// ── 카메라 권한 헤더 미들웨어 ───────────────────────────────
+// [카메라 권한 설정]
 function setPermissionHeaders(res) {
-    res.setHeader('Permissions-Policy', 'camera=*, microphone=*, gyroscope=*, accelerometer=*');
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Permissions-Policy', 'camera=(self)');
+    // Access-Control-Allow-Origin: 프론트/백이 같은 서버이므로 불필요
+    // 외부 도메인에서 API 호출이 필요한 경우 납품처에서 추가
 }
 
 // ── API: 이미지 업로드 ───────────────────────────────────────
