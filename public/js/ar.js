@@ -1,11 +1,11 @@
-// === State ===
+// 상태
         let video = null;
-        let scene = null;
-        let camera = null;
-        let renderer = null;
-        let hudMesh = null;
-        let hudTexture = null;
-        let hudMeshBaseScale = 1.0;
+        let canvas = null;
+        let ctx = null;
+        let overlayImg = null;
+        let imgX = 0;       // 이미지 중심 X (화면 픽셀)
+        let imgY = 0;       // 이미지 중심 Y (화면 픽셀)
+        let imgScale = 1.0;
         let isRunning = false;
 
         // 제스처 상태
@@ -20,21 +20,21 @@
             pinchStartScale: 1.0,
         };
 
-        // === URL 파라미터에서 이미지 ID 읽기 ===
+        // URL 파라미터에서 이미지 ID 읽기
         function getImageId() {
             return new URLSearchParams(window.location.search).get('id');
         }
 
-        // === 서버에서 이미지 Blob 로드 ===
+        // 이미지 Blob 로드
         async function fetchImageBlob(id) {
             const res = await fetch(`/api/image/${id}`);
             if (!res.ok) throw new Error(`이미지 로드 실패 (${res.status})`);
             return res.blob();
         }
 
-        // === 초기화 ===
+        // 초기화
         async function init() {
-            console.log('[AR] 초기화 시작');
+            console.log('초기화 시작');
             document.getElementById('loading-screen').classList.remove('hidden');
 
             const id = getImageId();
@@ -50,8 +50,8 @@
                 updateLoading('카메라 연결 중...');
                 await initCamera();
 
-                updateLoading('3D 엔진 초기화...');
-                initThreeJS();
+                updateLoading('캔버스 초기화...');
+                initCanvas();
 
                 updateLoading('이미지 로딩...');
                 await loadImageFromBlob(imageBlob);
@@ -63,10 +63,10 @@
                 isRunning = true;
                 animate();
 
-                console.log('[AR] 초기화 완료');
+                console.log('초기화 완료');
 
             } catch (error) {
-                console.error('[AR] 초기화 실패:', error);
+                console.error('초기화 실패:', error);
                 showError('초기화 실패: ' + error.message);
             }
         }
@@ -91,7 +91,7 @@
                         video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
                     });
                 } catch (envErr) {
-                    console.warn('[AR] 후면 카메라 실패, 기본 카메라 시도:', envErr.message);
+                    console.warn('후면 카메라 실패, 기본 카메라 시도:', envErr.message);
                     stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 }
 
@@ -120,7 +120,7 @@
                 const playPromise = video.play();
                 if (playPromise !== undefined) await playPromise;
 
-                console.log('[AR] 카메라 연결됨:', video.videoWidth, 'x', video.videoHeight);
+                console.log('카메라 연결됨:', video.videoWidth, 'x', video.videoHeight);
 
             } catch (e) {
                 if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
@@ -130,32 +130,18 @@
             }
         }
 
-        // === Three.js 초기화 ===
-        function initThreeJS() {
-            const container = document.getElementById('canvas-container');
+        // === 캔버스 초기화 ===
+        function initCanvas() {
+            canvas = document.getElementById('overlay-canvas');
+            ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
 
-            scene = new THREE.Scene();
-            scene.background = null;
+            // 이미지 초기 위치: 화면 중앙
+            imgX = window.innerWidth / 2;
+            imgY = window.innerHeight / 2;
 
-            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 1000);
-            camera.position.set(0, 0, 0);
-            scene.add(camera);
-
-            renderer = new THREE.WebGLRenderer({
-                antialias: true,
-                alpha: true,
-                premultipliedAlpha: false,
-                preserveDrawingBuffer: true,
-            });
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setClearColor(0x000000, 0);
-            renderer.domElement.style.cssText = 'position:absolute;top:0;left:0;z-index:1;pointer-events:none;';
-            container.appendChild(renderer.domElement);
-
-            scene.add(new THREE.AmbientLight(0xffffff, 1.0));
-
-            console.log('[AR] Three.js 초기화 완료');
+            console.log('캔버스 초기화 완료');
         }
 
         // === 이미지 로딩 ===
@@ -172,28 +158,10 @@
             return new Promise((resolve, reject) => {
                 const img = new Image();
                 img.onload = () => {
-                    hudTexture = new THREE.Texture(img);
-                    hudTexture.colorSpace = THREE.SRGBColorSpace;
-                    hudTexture.minFilter = THREE.LinearFilter;
-                    hudTexture.magFilter = THREE.LinearFilter;
-                    hudTexture.needsUpdate = true;
-
-                    const material = new THREE.MeshBasicMaterial({
-                        map: hudTexture,
-                        transparent: true,
-                        side: THREE.DoubleSide,
-                        depthWrite: false,
-                    });
-
-                    const aspect = img.width / img.height;
-                    const height = 0.5;
-                    const geometry = new THREE.PlaneGeometry(height * aspect, height);
-                    hudMesh = new THREE.Mesh(geometry, material);
-                    hudMesh.position.set(0, 0, -1.5);
-                    hudMesh.scale.set(1, 1, 1);
-                    camera.add(hudMesh);
-
-                    console.log('[AR] 이미지 로딩 완료:', img.width, 'x', img.height);
+                    overlayImg = img;
+                    // 초기 크기: 화면 높이의 40%
+                    imgScale = (window.innerHeight * 0.4) / img.naturalHeight;
+                    console.log('이미지 로딩 완료:', img.naturalWidth, 'x', img.naturalHeight);
                     resolve();
                 };
                 img.onerror = () => reject(new Error('이미지 로딩 실패'));
@@ -208,35 +176,31 @@
             // 터치 이벤트
             touchArea.addEventListener('touchstart', (e) => {
                 e.preventDefault();
-                if (!hudMesh) return;
+                if (!overlayImg) return;
                 if (e.touches.length === 1) {
                     gesture.isDragging = true;
                     gesture.isPinching = false;
                     gesture.dragStartX = e.touches[0].clientX;
                     gesture.dragStartY = e.touches[0].clientY;
-                    gesture.objStartX = hudMesh.position.x;
-                    gesture.objStartY = hudMesh.position.y;
+                    gesture.objStartX = imgX;
+                    gesture.objStartY = imgY;
                 } else if (e.touches.length === 2) {
                     gesture.isDragging = false;
                     gesture.isPinching = true;
                     gesture.pinchStartDist = getTouchDistance(e.touches);
-                    gesture.pinchStartScale = hudMeshBaseScale;
+                    gesture.pinchStartScale = imgScale;
                 }
             }, { passive: false });
 
             touchArea.addEventListener('touchmove', (e) => {
                 e.preventDefault();
-                if (!hudMesh) return;
+                if (!overlayImg) return;
                 if (gesture.isDragging && e.touches.length === 1) {
-                    const dx = e.touches[0].clientX - gesture.dragStartX;
-                    const dy = e.touches[0].clientY - gesture.dragStartY;
-                    const s = screenPixelToLocal();
-                    hudMesh.position.x = gesture.objStartX + dx * s;
-                    hudMesh.position.y = gesture.objStartY - dy * s;
+                    imgX = gesture.objStartX + (e.touches[0].clientX - gesture.dragStartX);
+                    imgY = gesture.objStartY + (e.touches[0].clientY - gesture.dragStartY);
                 } else if (gesture.isPinching && e.touches.length === 2) {
                     const ratio = getTouchDistance(e.touches) / gesture.pinchStartDist;
-                    hudMeshBaseScale = Math.max(0.3, Math.min(5.0, gesture.pinchStartScale * ratio));
-                    hudMesh.scale.set(hudMeshBaseScale, hudMeshBaseScale, hudMeshBaseScale);
+                    imgScale = Math.max(0.1, Math.min(5.0, gesture.pinchStartScale * ratio));
                 }
             }, { passive: false });
 
@@ -249,36 +213,34 @@
                     gesture.isDragging = true;
                     gesture.dragStartX = e.touches[0].clientX;
                     gesture.dragStartY = e.touches[0].clientY;
-                    gesture.objStartX = hudMesh ? hudMesh.position.x : 0;
-                    gesture.objStartY = hudMesh ? hudMesh.position.y : 0;
+                    gesture.objStartX = imgX;
+                    gesture.objStartY = imgY;
                 }
             });
 
             // 마우스 이벤트 (데스크탑)
             let mouseDown = false;
             touchArea.addEventListener('mousedown', (e) => {
-                if (!hudMesh) return;
+                if (!overlayImg) return;
                 mouseDown = true;
                 gesture.dragStartX = e.clientX;
                 gesture.dragStartY = e.clientY;
-                gesture.objStartX = hudMesh.position.x;
-                gesture.objStartY = hudMesh.position.y;
+                gesture.objStartX = imgX;
+                gesture.objStartY = imgY;
             });
             touchArea.addEventListener('mousemove', (e) => {
-                if (!mouseDown || !hudMesh) return;
-                const s = screenPixelToLocal();
-                hudMesh.position.x = gesture.objStartX + (e.clientX - gesture.dragStartX) * s;
-                hudMesh.position.y = gesture.objStartY - (e.clientY - gesture.dragStartY) * s;
+                if (!mouseDown || !overlayImg) return;
+                imgX = gesture.objStartX + (e.clientX - gesture.dragStartX);
+                imgY = gesture.objStartY + (e.clientY - gesture.dragStartY);
             });
             touchArea.addEventListener('mouseup', () => { mouseDown = false; });
             touchArea.addEventListener('mouseleave', () => { mouseDown = false; });
 
             // 마우스 휠
             touchArea.addEventListener('wheel', (e) => {
-                if (!hudMesh) return;
+                if (!overlayImg) return;
                 e.preventDefault();
-                hudMeshBaseScale = Math.max(0.3, Math.min(5.0, hudMeshBaseScale * (e.deltaY > 0 ? 0.9 : 1.1)));
-                hudMesh.scale.set(hudMeshBaseScale, hudMeshBaseScale, hudMeshBaseScale);
+                imgScale = Math.max(0.1, Math.min(5.0, imgScale * (e.deltaY > 0 ? 0.9 : 1.1)));
             }, { passive: false });
 
             // 버튼 이벤트
@@ -313,7 +275,7 @@
 
             window.addEventListener('resize', onResize);
 
-            console.log('[AR] 이벤트 설정 완료');
+            console.log('이벤트 설정 완료');
         }
 
         // === 유틸리티 ===
@@ -323,15 +285,9 @@
             return Math.sqrt(dx * dx + dy * dy);
         }
 
-        function screenPixelToLocal() {
-            const fovRad = THREE.MathUtils.degToRad(camera.fov);
-            return (2 * 1.5 * Math.tan(fovRad / 2)) / window.innerHeight;
-        }
-
         function onResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
         }
 
         // === UI 함수 ===
@@ -360,7 +316,13 @@
         function animate() {
             if (!isRunning) return;
             requestAnimationFrame(animate);
-            renderer.render(scene, camera);
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (!overlayImg) return;
+
+            const w = overlayImg.naturalWidth * imgScale;
+            const h = overlayImg.naturalHeight * imgScale;
+            ctx.drawImage(overlayImg, imgX - w / 2, imgY - h / 2, w, h);
         }
 
         // === 시작 (iOS: 사용자 탭 후 init) ===

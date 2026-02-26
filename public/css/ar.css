@@ -27,8 +27,8 @@
             transform: scaleX(-1);
         }
 
-        /* Three.js 캔버스 컨테이너 */
-        #canvas-container {
+        /* 오버레이 캔버스 */
+        #overlay-canvas {
             position: fixed;
             top: 0;
             left: 0;

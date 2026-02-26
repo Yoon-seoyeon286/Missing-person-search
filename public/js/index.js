@@ -1,3 +1,4 @@
+//@imgly/background-removal
 import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.1/+esm';
 
         // 처리된 이미지 Blob
@@ -9,6 +10,7 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
             initApp();
         });
 
+        //초기화!
         function initApp() {
             // 요소 참조
             const uploadArea = document.getElementById('upload-area');
@@ -42,7 +44,7 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
             // 파일 선택 처리
             fileInput.onchange = (e) => {
                 const file = e.target.files[0];
-                if (file) handleFile(file);
+                if (file) handleFile(file); //배경 제거 준비
             };
 
             // 드래그 앤 드롭
@@ -100,7 +102,7 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
                 await processImage(file);
             }
 
-            // 테두리 정리 (Choke) - 알파 채널 침식
+            // 테두리 정리 - 초크매트
             async function chokeAlpha(blob, amount = 2) {
                 return new Promise((resolve) => {
                     const img = new Image();
@@ -122,7 +124,7 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
                             alphaOrig[i] = data[i * 4 + 3];
                         }
 
-                        // 침식 (Erosion) - 주변 픽셀 중 가장 작은 알파값 사용
+                        // 주변 픽셀 중 가장 작은 알파값 사용
                         for (let pass = 0; pass < amount; pass++) {
                             const alphaCopy = new Uint8Array(alphaOrig);
                             for (let y = 1; y < height - 1; y++) {
@@ -157,7 +159,7 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
                 });
             }
 
-            // 이미지 처리 (배경 제거)
+            // 배경 제거
             async function processImage(file) {
                 progressContainer.classList.add('visible');
                 resultContainer.classList.remove('visible');
@@ -197,9 +199,9 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
                     resultImage.src = resultURL;
                     resultContainer.classList.add('visible');
 
-                    // AR 버튼 표시
+                    // 카메라로 보는 버튼 표시
                     arButton.classList.add('visible');
-                    console.log('[Upload] AR 버튼 표시됨, visible 클래스:', arButton.classList.contains('visible'));
+                    console.log('[Upload] 카메라 열기 버튼 표시됨, visible 클래스:', arButton.classList.contains('visible'));
 
                     setTimeout(() => {
                         progressContainer.classList.remove('visible');
