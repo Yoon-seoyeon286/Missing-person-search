@@ -1,8 +1,11 @@
+require('dotenv').config();
 const express = require('express'); // Node.js 런타임 환경에서 구동되는 웹 프레임워크
 const path = require('path');
 const fs = require('fs'); //파일을 만들거나 읽는 도구
 const multer = require('multer'); // 사용자가 보낸 이미지 파일을 해석해서 저장
-const { v4: uuidv4 } = require('uuid'); //랜덤한 이름 만들기 
+const { v4: uuidv4 } = require('uuid'); //랜덤한 이름 만들기
+const Replicate = require('replicate');
+const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
 
 const app = express(); //서버 객체
 const PORT = process.env.PORT || 3000;
@@ -30,6 +33,16 @@ const upload = multer({
     },
 });
 
+// [합성용 multer - 메모리에 보관, 이미지 전체 허용]
+const compositeUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) cb(null, true);
+        else cb(new Error('이미지 파일만 허용됩니다'));
+    },
+});
+
 // [카메라 권한 설정]
 function setPermissionHeaders(res) {
     res.setHeader('Permissions-Policy', 'camera=(self)');
@@ -53,6 +66,55 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
         id,
         url: `${baseUrl}/ar.html?id=${id}`,
     });
+});
+
+// [메뉴 1-2: 합성 이미지 생성]
+// POST /api/composite  multipart { face: File, outfit?: File, height, weight, age, outfitText? }
+app.post('/api/composite', compositeUpload.fields([
+    { name: 'face', maxCount: 1 },
+    { name: 'outfit', maxCount: 1 },
+]), async (req, res) => {
+    const { height, weight, age, outfitText } = req.body;
+    const faceFile = req.files?.face?.[0];
+
+    if (!faceFile) return res.status(400).json({ error: '얼굴 사진이 없습니다' });
+
+    const bodyDesc = buildBodyDescription(height, weight, age);
+    if (!bodyDesc) return res.status(400).json({ error: '신체 정보를 입력해주세요' });
+
+    const outfit = outfitText || 'casual clothes';
+    const prompt = `Full body photo of a Korean person, ${bodyDesc}, wearing ${outfit}, standing straight facing forward, plain white background, photorealistic, high quality`;
+
+    try {
+        // 1단계: 전신 이미지 생성
+        console.log('[Composite] 1단계: 전신 생성 중...');
+        const fluxOutput = await replicate.run('black-forest-labs/flux-dev', {
+            input: { prompt, num_outputs: 1, aspect_ratio: '2:3' },
+        });
+        const bodyImageUrl = Array.isArray(fluxOutput) ? fluxOutput[0] : fluxOutput;
+
+        // 2단계: 얼굴 합성
+        console.log('[Composite] 2단계: 얼굴 합성 중...');
+        const faceBase64 = `data:${faceFile.mimetype};base64,${faceFile.buffer.toString('base64')}`;
+        const swapOutput = await replicate.run('yan-foto/face-swap', {
+            input: { swap_image: faceBase64, base_image: bodyImageUrl.toString() },
+        });
+        const resultUrl = swapOutput.toString();
+
+        // 3단계: 결과 저장
+        console.log('[Composite] 3단계: 결과 저장 중...');
+        const imgRes = await fetch(resultUrl);
+        const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
+        const id = uuidv4();
+        fs.writeFileSync(path.join(UPLOADS_DIR, id + '.png'), imgBuffer);
+
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        res.json({ id, url: `${baseUrl}/ar.html?id=${id}` });
+
+    } catch (err) {
+        console.error('[Composite] 오류:', err);
+        res.status(500).json({ error: '합성 실패: ' + err.message });
+    }
 });
 
 // [메뉴 2: 이미지 보여주기]
@@ -85,6 +147,17 @@ app.get('{*path}', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+
+// height: cm, weight: kg, age: 세 → 영문 프롬프트 문자열
+function buildBodyDescription(height, weight, age) {
+    const h = Number(height), w = Number(weight), a = Number(age);
+    if (!h || !w || !a) return null;
+    const bmi = w / ((h / 100) ** 2);
+    const heightStr = h < 155 ? 'short' : h < 163 ? 'below average height' : h < 172 ? 'average height' : h < 180 ? 'tall' : 'very tall';
+    const buildStr  = bmi < 17 ? 'very thin build' : bmi < 20 ? 'slim build' : bmi < 23 ? 'average build' : bmi < 25 ? 'slightly stocky build' : bmi < 28 ? 'stocky build' : 'heavy build';
+    const ageStr    = a < 13 ? 'child' : a < 20 ? 'teenager' : a < 30 ? 'young adult in 20s' : a < 40 ? 'adult in 30s' : a < 50 ? 'adult in 40s' : a < 60 ? 'middle-aged' : a < 70 ? 'older adult' : 'elderly person';
+    return `${ageStr}, ${heightStr}, ${h}cm tall, ${w}kg, ${buildStr}`;
+}
 
 //서버 시작
 app.listen(PORT, () => {

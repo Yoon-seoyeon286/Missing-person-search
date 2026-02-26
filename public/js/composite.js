@@ -53,9 +53,53 @@ document.addEventListener('DOMContentLoaded', () => {
         outfitTextPanel.classList.add('hidden');
     };
 
-    // 합성 시작 버튼 (다음 단계에서 구현)
-    document.getElementById('btn-composite').onclick = () => {
-        // TODO: Step 2 - 이미지 생성 API 연동
+    // 합성 시작
+    const btnComposite = document.getElementById('btn-composite');
+    btnComposite.removeAttribute('disabled');
+
+    btnComposite.onclick = async () => {
+        const height = document.getElementById('height').value;
+        const weight = document.getElementById('weight').value;
+        const age    = document.getElementById('age').value;
+        const faceFile = document.getElementById('face-input').files[0];
+
+        if (!height || !weight || !age) { alert('키, 몸무게, 나이를 입력해주세요'); return; }
+        if (!faceFile) { alert('얼굴 사진을 올려주세요'); return; }
+
+        const isTextOutfit = document.getElementById('outfit-text-btn').classList.contains('active');
+        const outfitText   = document.getElementById('outfit-text').value;
+        const outfitFile   = document.getElementById('outfit-input').files[0];
+
+        if (isTextOutfit && !outfitText.trim()) { alert('옷차림을 입력해주세요'); return; }
+        if (!isTextOutfit && !outfitFile) { alert('옷차림 사진을 올려주세요'); return; }
+
+        const formData = new FormData();
+        formData.append('height', height);
+        formData.append('weight', weight);
+        formData.append('age', age);
+        formData.append('face', faceFile);
+        if (isTextOutfit) {
+            formData.append('outfitText', outfitText);
+        } else {
+            formData.append('outfit', outfitFile);
+        }
+
+        btnComposite.disabled = true;
+        btnComposite.textContent = '합성 중... (약 30~60초)';
+
+        try {
+            const res = await fetch('/api/composite', { method: 'POST', body: formData });
+            if (!res.ok) {
+                const { error } = await res.json();
+                throw new Error(error);
+            }
+            const { id } = await res.json();
+            window.location.href = `ar.html?id=${id}`;
+        } catch (err) {
+            alert('오류: ' + err.message);
+            btnComposite.disabled = false;
+            btnComposite.textContent = '합성 시작';
+        }
     };
 
 });
