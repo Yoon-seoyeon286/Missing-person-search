@@ -136,16 +136,18 @@
             background: rgba(0, 84, 166, 0.25);
         }
 
-        .action-group {
-            display: none;
+        .main-actions {
+            display: flex;
+            flex-direction: column;
             gap: 15px;
             margin-top: 20px;
             width: 100%;
             max-width: 400px;
         }
 
-        .action-group.visible {
-            display: flex;
+        .btn-secondary:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
         }
 
         .preview-container {

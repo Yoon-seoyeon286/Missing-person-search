@@ -3,7 +3,6 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
 
         // 처리된 이미지 Blob
         let processedImageBlob = null;
-        let selectedFile = null;
 
         // DOM 로드 후 실행
         document.addEventListener('DOMContentLoaded', () => {
@@ -14,15 +13,11 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
         //초기화!
         function initApp() {
             // 요소 참조
-            const uploadArea = document.getElementById('upload-area');
             const fileInput = document.getElementById('file-input');
-            const galleryBtn = document.getElementById('gallery-btn');
+            const uploadFullBtn = document.getElementById('upload-full-btn');
             const previewContainer = document.getElementById('preview-container');
             const previewImage = document.getElementById('preview-image');
             const previewInfo = document.getElementById('preview-info');
-            const actionGroup = document.getElementById('action-group');
-            const uploadBtn = document.getElementById('upload-btn');
-            const compositeBtn = document.getElementById('composite-btn');
             const progressContainer = document.getElementById('progress-container');
             const progressFill = document.getElementById('progress-fill');
             const progressText = document.getElementById('progress-text');
@@ -33,44 +28,19 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
 
             console.log('[Upload] 요소 참조:', { arButton: !!arButton });
 
-            // 갤러리 버튼
-            galleryBtn.onclick = () => {
+            // 전신 사진 올리기 버튼
+            uploadFullBtn.onclick = () => {
                 fileInput.removeAttribute('capture');
                 fileInput.click();
             };
 
-            // 업로드 영역 클릭
-            uploadArea.onclick = () => {
-                fileInput.removeAttribute('capture');
-                fileInput.click();
-            };
-
-            // 파일 선택 처리
+            // 파일 선택 → 미리보기 + 자동 배경 제거
             fileInput.onchange = (e) => {
                 const file = e.target.files[0];
-                if (file) handleFile(file); //배경 제거 준비
+                if (file) handleFile(file);
             };
 
-            // 드래그 앤 드롭
-            uploadArea.ondragover = (e) => {
-                e.preventDefault();
-                uploadArea.classList.add('drag-over');
-            };
-
-            uploadArea.ondragleave = () => {
-                uploadArea.classList.remove('drag-over');
-            };
-
-            uploadArea.ondrop = (e) => {
-                e.preventDefault();
-                uploadArea.classList.remove('drag-over');
-                const file = e.dataTransfer.files[0];
-                if (file && file.type.startsWith('image/')) {
-                    handleFile(file);
-                }
-            };
-
-            // AR 버튼 클릭 - onclick 사용
+            // AR 버튼 클릭
             arButton.onclick = function(e) {
                 e.preventDefault();
                 console.log('[Upload] AR 버튼 onclick 발생');
@@ -93,29 +63,18 @@ import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background
 
                 hideError();
 
-                selectedFile = file;
-
                 // 원본 미리보기 표시
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     previewImage.src = e.target.result;
                     previewInfo.textContent = `${file.name} (${formatFileSize(file.size)})`;
                     previewContainer.classList.add('visible');
-                    actionGroup.classList.add('visible');
                 };
                 reader.readAsDataURL(file);
+
+                // 배경 제거 바로 시작
+                await processImage(file);
             }
-
-            // 업로드 버튼 - 배경 제거 후 AR로 이동
-            uploadBtn.onclick = () => {
-                if (!selectedFile) return;
-                processImage(selectedFile);
-            };
-
-            // 합성하기 버튼 - 추후 구현
-            compositeBtn.onclick = () => {
-                alert('준비 중입니다.');
-            };
 
             // 테두리 정리 - 초크매트
             async function chokeAlpha(blob, amount = 2) {
