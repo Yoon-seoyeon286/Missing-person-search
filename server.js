@@ -103,17 +103,22 @@ app.post('/api/composite', (req, res, next) => {
         const faceBase64 = `data:${faceFile.mimetype};base64,${faceFile.buffer.toString('base64')}`;
         let instantOutput;
         try {
-            instantOutput = await replicate.run('zsxkib/instant-id', {
-                input: {
-                    image: faceBase64,
-                    prompt,
-                    negative_prompt: 'ugly, deformed, noisy, blurry, low quality, cartoon, anime, illustration, painting, disfigured, bad anatomy',
-                    ip_adapter_scale: 0.8,
-                    controlnet_conditioning_scale: 0.8,
-                    num_inference_steps: 30,
-                    guidance_scale: 5,
-                },
-            });
+            instantOutput = await replicate.run(
+                'grandlineai/instant-id-photorealistic:03914a0c3326bf44383d0cd84b06822618af879229ce5d1d53bef38d93b68279',
+                {
+                    input: {
+                        image: faceBase64,
+                        prompt,
+                        negative_prompt: 'ugly, deformed, noisy, blurry, low quality, cartoon, anime, illustration, painting, disfigured, bad anatomy',
+                        width: 512,
+                        height: 768,
+                        ip_adapter_scale: 0.8,
+                        controlnet_conditioning_scale: 0.8,
+                        num_inference_steps: 30,
+                        guidance_scale: 7.5,
+                    },
+                }
+            );
         } catch (e) {
             console.error('[Composite] InstantID 오류:', e);
             return res.status(500).json({ error: '이미지 생성 실패: ' + (e?.message || String(e)) });
