@@ -89,19 +89,35 @@ app.post('/api/composite', (req, res, next) => {
     });
 }, async (req, res) => {
     const { height, weight, age, outfitText } = req.body;
-    const faceFile = req.files?.face?.[0];
+    const faceFile  = req.files?.face?.[0];
+    const outfitFile = req.files?.outfit?.[0];
 
     if (!faceFile) return res.status(400).json({ error: '얼굴 사진이 없습니다' });
 
     const bodyDesc = buildBodyDescription(height, weight, age);
     if (!bodyDesc) return res.status(400).json({ error: '신체 정보를 입력해주세요' });
 
-    const outfit = outfitText || 'casual clothes';
-
     try {
-        // gpt-image-1 images.edit: 얼굴 사진을 참조해 전신 생성
-        // ChatGPT 웹과 동일한 엔진 — 얼굴/헤어스타일/피부톤 그대로 유지
-        console.log('[Composite] gpt-image-1 images.edit 전신 생성 중...');
+        // 옷차림 결정: 텍스트 > 사진 묘사 > 기본값
+        let outfit = outfitText?.trim();
+        if (!outfit && outfitFile) {
+            console.log('[Composite] 옷차림 사진 분석 중...');
+            const outfitBase64 = `data:${outfitFile.mimetype};base64,${outfitFile.buffer.toString('base64')}`;
+            const visionRes = await openai.chat.completions.create({
+                model: 'gpt-4o-mini',
+                messages: [{ role: 'user', content: [
+                    { type: 'image_url', image_url: { url: outfitBase64 } },
+                    { type: 'text', text: 'Describe the clothing/outfit in this image in 1 short sentence in English. Only describe the clothes, not the person.' },
+                ]}],
+                max_tokens: 60,
+            });
+            outfit = visionRes.choices[0].message.content;
+            console.log('[Composite] 옷차림 묘사:', outfit);
+        }
+        if (!outfit) outfit = 'casual clothes';
+
+        // gpt-image-1 images.edit: 얼굴 사진 참조 → 전신 생성
+        console.log('[Composite] gpt-image-1 전신 생성 중...');
         const { toFile } = require('openai');
         const faceImageFile = await toFile(faceFile.buffer, 'face.png', { type: faceFile.mimetype });
 
@@ -110,7 +126,7 @@ app.post('/api/composite', (req, res, next) => {
             const imageRes = await openai.images.edit({
                 model: 'gpt-image-1',
                 image: faceImageFile,
-                prompt: `Full body photograph of this exact person. Preserve their face, hairstyle, and skin tone exactly as shown. The person is ${bodyDesc}, wearing ${outfit}. Complete full body shot from head to toe including feet. Standing straight, facing forward, arms at sides. Professional studio photography, clean neutral gray background, soft even studio lighting. Photorealistic, real camera photo, sharp focus.`,
+                prompt: `Full body photo of this person (${bodyDesc}), wearing ${outfit}. Show the entire body from head to toe.`,
                 size: '1024x1536',
                 quality: 'high',
                 n: 1,
