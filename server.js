@@ -5,9 +5,10 @@ const fs = require('fs'); //파일을 만들거나 읽는 도구
 const multer = require('multer'); // 사용자가 보낸 이미지 파일을 해석해서 저장
 const { v4: uuidv4 } = require('uuid'); //랜덤한 이름 만들기
 const OpenAI = require('openai');
-const { toFile } = require('openai');
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 if (!globalThis.File) globalThis.File = require('node:buffer').File;
+const { fal } = require('@fal-ai/client');
+fal.config({ credentials: process.env.FAL_KEY });
 
 const app = express(); //서버 객체
 const PORT = process.env.PORT || 3000;
@@ -96,54 +97,63 @@ app.post('/api/composite', (req, res, next) => {
     if (!bodyDesc) return res.status(400).json({ error: '신체 정보를 입력해주세요' });
 
     const outfit = outfitText || 'casual clothes';
-    const prompt = `
-This image MUST depict the SAME INDIVIDUAL as the reference image.
-Identity consistency is mandatory and non-negotiable.
-
-Do NOT alter facial structure, including eye shape, eye spacing,
-nose width, nose bridge, lip shape, jawline, cheekbone structure,
-head size, or proportions.
-
-No face beautification, no generic features, no face averaging,
-no idealization, no model-like appearance.
-
-A full-body professional photograph of the exact same person
-shown in the reference image.
-Preserve face, hairstyle, skin tone, and age exactly.
-
-The person is ${bodyDesc}, wearing ${outfit},
-standing naturally facing forward.
-
-Shot in a photography studio with soft neutral background
-and professional lighting.
-
-Realistic skin texture, sharp detail.
-Indistinguishable from a real camera photo.
-Not an illustration, not a drawing.
-Show the complete body from head to toe.
-`;
-    console.log('[Composite] 프롬프트:', prompt);
 
     try {
-        // gpt-image-1로 얼굴 기반 전신 이미지 생성
-        console.log('[Composite] gpt-image-1 생성 중...');
-        const imageFile = await toFile(faceFile.buffer, 'face.png', { type: faceFile.mimetype });
-        let response;
+        // 1단계: GPT-4o Vision으로 얼굴 특징 분석
+        console.log('[Composite] 1단계: GPT-4o 얼굴 분석 중...');
+        const faceBase64 = `data:${faceFile.mimetype};base64,${faceFile.buffer.toString('base64')}`;
+        let faceDescription;
         try {
-            response = await openai.images.edit({
-                model: 'gpt-image-1',
-                image: imageFile,
-                prompt,
-                size: '1024x1536',
-                quality: 'high',
-                n: 1,
+            const visionRes = await openai.chat.completions.create({
+                model: 'gpt-4o',
+                messages: [{
+                    role: 'user',
+                    content: [
+                        { type: 'image_url', image_url: { url: faceBase64 } },
+                        { type: 'text', text: 'Describe this person\'s physical appearance for image generation. Include face shape, eye characteristics, nose shape, lip shape, jawline, hairstyle and color, skin tone, and estimated age. Be specific and objective. 2-3 sentences in English only.' },
+                    ],
+                }],
+                max_tokens: 200,
+            });
+            faceDescription = visionRes.choices[0].message.content;
+            console.log('[Composite] 얼굴 묘사:', faceDescription);
+        } catch (e) {
+            console.error('[Composite] GPT-4o 오류:', e);
+            return res.status(500).json({ error: '얼굴 분석 실패: ' + (e?.message || String(e)) });
+        }
+
+        // 2단계: 얼굴 이미지를 fal.ai 스토리지에 업로드
+        console.log('[Composite] 2단계: 이미지 업로드 중...');
+        const { Blob } = require('node:buffer');
+        const faceBlob = new Blob([faceFile.buffer], { type: faceFile.mimetype });
+        const faceUrl = await fal.storage.upload(faceBlob);
+        console.log('[Composite] 업로드 URL:', faceUrl);
+
+        // 3단계: fal.ai InstantID로 전신 생성
+        console.log('[Composite] 3단계: InstantID 전신 생성 중...');
+        const falPrompt = `Full body photograph. ${faceDescription} The person is ${bodyDesc}, wearing ${outfit}, standing straight facing forward. Studio lighting, neutral background, photorealistic, sharp detail, real camera photo.`;
+        let falResult;
+        try {
+            falResult = await fal.subscribe('fal-ai/instantid', {
+                input: {
+                    face_image_url: faceUrl,
+                    prompt: falPrompt,
+                    negative_prompt: 'ugly, deformed, blurry, bad anatomy, cartoon, illustration, drawing, anime, nsfw',
+                    enhance_face_region: true,
+                    style: '(No style)',
+                    num_inference_steps: 30,
+                },
             });
         } catch (e) {
-            console.error('[Composite] gpt-image-1 오류:', e);
+            console.error('[Composite] InstantID 오류:', e);
             return res.status(500).json({ error: '이미지 생성 실패: ' + (e?.message || String(e)) });
         }
-        console.log('[Composite] gpt-image-1 완료');
-        const imgBuffer = Buffer.from(response.data[0].b64_json, 'base64');
+        console.log('[Composite] InstantID 완료:', falResult.data);
+
+        const resultUrl = falResult.data.image.url;
+        const imgFetchRes = await fetch(resultUrl);
+        if (!imgFetchRes.ok) throw new Error(`이미지 다운로드 실패 (${imgFetchRes.status})`);
+        const imgBuffer = Buffer.from(await imgFetchRes.arrayBuffer());
         const id = uuidv4();
         fs.writeFileSync(path.join(UPLOADS_DIR, id + '.png'), imgBuffer);
 
