@@ -96,7 +96,7 @@ app.post('/api/composite', (req, res, next) => {
     if (!bodyDesc) return res.status(400).json({ error: '신체 정보를 입력해주세요' });
 
     const outfit = outfitText || 'casual clothes';
-    const prompt = `Full body photo of a Korean person, ${bodyDesc}, wearing ${outfit}, standing straight facing forward, plain white background, photorealistic, high quality`;
+    const prompt = `Generate a full body photo of the exact person shown in this reference image. Preserve their facial features, hairstyle, skin tone, and overall appearance exactly as shown. The person is ${bodyDesc}. They are wearing ${outfit}. They should be standing upright facing forward on a plain white background. Show the full body from head to toe. Photorealistic, high quality.`;
     console.log('[Composite] 프롬프트:', prompt);
 
     try {
@@ -110,6 +110,7 @@ app.post('/api/composite', (req, res, next) => {
                 image: imageFile,
                 prompt,
                 size: '1024x1536',
+                quality: 'high',
                 n: 1,
             });
         } catch (e) {
