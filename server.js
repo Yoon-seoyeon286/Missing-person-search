@@ -108,7 +108,7 @@ app.post('/api/composite', (req, res, next) => {
                 model: 'gpt-image-1',
                 prompt: bodyPrompt,
                 n: 1,
-                size: '1024x1792',
+                size: '1024x1536',
                 quality: 'high',
             });
             bodyImageBase64 = imageRes.data[0].b64_json;
