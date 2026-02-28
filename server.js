@@ -9,6 +9,8 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 if (!globalThis.File) globalThis.File = require('node:buffer').File;
 const { fal } = require('@fal-ai/client');
 fal.config({ credentials: process.env.FAL_KEY });
+const Replicate = require('replicate');
+const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
 
 const app = express(); //서버 객체
 const PORT = process.env.PORT || 3000;
@@ -138,9 +140,36 @@ app.post('/api/composite', (req, res, next) => {
             return res.status(500).json({ error: '이미지 생성 실패: ' + (e?.message || String(e)) });
         }
 
-        const imgBuffer = Buffer.from(imageBase64, 'base64');
+        // face-swap: 생성된 전신에 원본 얼굴 합성
+        console.log('[Composite] face-swap 중...');
+        const { Blob } = require('node:buffer');
+        const [faceUrl, bodyUrl] = await Promise.all([
+            fal.storage.upload(new Blob([faceFile.buffer], { type: faceFile.mimetype })),
+            fal.storage.upload(new Blob([Buffer.from(imageBase64, 'base64')], { type: 'image/png' })),
+        ]);
+        console.log('[Composite] 업로드 완료 - 얼굴:', faceUrl, '전신:', bodyUrl);
+
+        let swapOutput;
+        try {
+            swapOutput = await replicate.run('cdingram/face-swap', {
+                input: { source_image: faceUrl, target_image: bodyUrl },
+            });
+        } catch (e) {
+            console.error('[Composite] face-swap 오류:', e);
+            return res.status(500).json({ error: '얼굴 합성 실패: ' + (e?.message || String(e)) });
+        }
+        console.log('[Composite] face-swap 완료:', swapOutput);
+
+        // swapOutput은 URL 문자열 또는 ReadableStream
+        const resultUrl = typeof swapOutput === 'string' ? swapOutput : swapOutput?.[0] ?? swapOutput?.url;
+        if (!resultUrl) throw new Error('face-swap 결과 URL 없음');
+
+        const swapFetchRes = await fetch(resultUrl);
+        if (!swapFetchRes.ok) throw new Error(`결과 다운로드 실패 (${swapFetchRes.status})`);
+        const finalBuffer = Buffer.from(await swapFetchRes.arrayBuffer());
+
         const id = uuidv4();
-        fs.writeFileSync(path.join(UPLOADS_DIR, id + '.png'), imgBuffer);
+        fs.writeFileSync(path.join(UPLOADS_DIR, id + '.png'), finalBuffer);
 
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         res.json({ id, url: `${baseUrl}/ar.html?id=${id}` });
