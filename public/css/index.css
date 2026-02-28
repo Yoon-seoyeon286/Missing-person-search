@@ -22,6 +22,44 @@
         }
 
 
+        .app-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 24px;
+            padding: 16px 20px;
+            background: rgba(0, 84, 166, 0.08);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 400px;
+            border: 1px solid rgba(0, 84, 166, 0.15);
+        }
+
+        .police-logo {
+            height: 56px;
+            width: auto;
+            flex-shrink: 0;
+        }
+
+        .header-text {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .app-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a2d45;
+            line-height: 1.2;
+        }
+
+        .app-org {
+            font-size: 12px;
+            color: rgba(26, 45, 69, 0.6);
+            font-weight: 400;
+        }
+
         .subtitle {
             color: rgba(26, 45, 69, 0.7);
             font-size: 14px;

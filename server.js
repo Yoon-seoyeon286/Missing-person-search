@@ -99,58 +99,59 @@ app.post('/api/composite', (req, res, next) => {
     const outfit = outfitText || 'casual clothes';
 
     try {
-        // 1단계: GPT-4o Vision으로 얼굴 특징 분석
-        console.log('[Composite] 1단계: GPT-4o 얼굴 분석 중...');
-        const faceBase64 = `data:${faceFile.mimetype};base64,${faceFile.buffer.toString('base64')}`;
-        let faceDescription;
+        // 1단계: gpt-image-1로 전신 이미지 생성 (얼굴은 generic placeholder)
+        console.log('[Composite] 1단계: gpt-image-1 전신 생성 중...');
+        const bodyPrompt = `Full body photograph of a ${bodyDesc} person, wearing ${outfit}. Complete full body shot showing entire person from head to toe including feet. Standing upright, facing forward, arms relaxed at sides. Professional studio photography, clean neutral gray background, soft even lighting. Photorealistic, real camera photo, sharp focus throughout entire body. The face is a generic neutral face - do not emphasize facial features.`;
+        let bodyImageBase64;
         try {
-            const visionRes = await openai.chat.completions.create({
-                model: 'gpt-4o',
-                messages: [{
-                    role: 'user',
-                    content: [
-                        { type: 'image_url', image_url: { url: faceBase64 } },
-                        { type: 'text', text: 'Describe this person\'s physical appearance for image generation. Include face shape, eye characteristics, nose shape, lip shape, jawline, hairstyle and color, skin tone, and estimated age. Be specific and objective. 2-3 sentences in English only.' },
-                    ],
-                }],
-                max_tokens: 200,
+            const imageRes = await openai.images.generate({
+                model: 'gpt-image-1',
+                prompt: bodyPrompt,
+                n: 1,
+                size: '1024x1792',
+                quality: 'high',
             });
-            faceDescription = visionRes.choices[0].message.content;
-            console.log('[Composite] 얼굴 묘사:', faceDescription);
+            bodyImageBase64 = imageRes.data[0].b64_json;
+            console.log('[Composite] gpt-image-1 전신 생성 완료');
         } catch (e) {
-            console.error('[Composite] GPT-4o 오류:', e);
-            return res.status(500).json({ error: '얼굴 분석 실패: ' + (e?.message || String(e)) });
+            console.error('[Composite] gpt-image-1 오류:', e);
+            return res.status(500).json({ error: '전신 이미지 생성 실패: ' + (e?.message || String(e)) });
         }
 
-        // 2단계: 얼굴 이미지를 fal.ai 스토리지에 업로드
+        // 2단계: 얼굴 사진 + 전신 이미지를 fal.ai 스토리지에 업로드
         console.log('[Composite] 2단계: 이미지 업로드 중...');
         const { Blob } = require('node:buffer');
-        const faceBlob = new Blob([faceFile.buffer], { type: faceFile.mimetype });
-        const faceUrl = await fal.storage.upload(faceBlob);
-        console.log('[Composite] 업로드 URL:', faceUrl);
 
-        // 3단계: fal.ai InstantID로 전신 생성
-        console.log('[Composite] 3단계: InstantID 전신 생성 중...');
-        const falPrompt = `Full body photograph. ${faceDescription} The person is ${bodyDesc}, wearing ${outfit}, standing straight facing forward. Studio lighting, neutral background, photorealistic, sharp detail, real camera photo.`;
-        let falResult;
+        const faceBlob = new Blob([faceFile.buffer], { type: faceFile.mimetype });
+        const bodyBuffer = Buffer.from(bodyImageBase64, 'base64');
+        const bodyBlob = new Blob([bodyBuffer], { type: 'image/png' });
+
+        const [faceUrl, bodyUrl] = await Promise.all([
+            fal.storage.upload(faceBlob),
+            fal.storage.upload(bodyBlob),
+        ]);
+        console.log('[Composite] 얼굴 URL:', faceUrl);
+        console.log('[Composite] 전신 URL:', bodyUrl);
+
+        // 3단계: fal-ai/face-swap으로 얼굴 합성
+        console.log('[Composite] 3단계: face-swap 합성 중...');
+        let swapResult;
         try {
-            falResult = await fal.subscribe('fal-ai/instantid', {
+            swapResult = await fal.subscribe('fal-ai/face-swap', {
                 input: {
+                    base_image_url: bodyUrl,
                     face_image_url: faceUrl,
-                    prompt: falPrompt,
-                    negative_prompt: 'ugly, deformed, blurry, bad anatomy, cartoon, illustration, drawing, anime, nsfw',
-                    enhance_face_region: true,
-                    style: '(No style)',
-                    num_inference_steps: 30,
                 },
             });
         } catch (e) {
-            console.error('[Composite] InstantID 오류:', e);
-            return res.status(500).json({ error: '이미지 생성 실패: ' + (e?.message || String(e)) });
+            console.error('[Composite] face-swap 오류:', e);
+            return res.status(500).json({ error: '얼굴 합성 실패: ' + (e?.message || String(e)) });
         }
-        console.log('[Composite] InstantID 완료:', falResult.data);
+        console.log('[Composite] face-swap 완료:', swapResult.data);
 
-        const resultUrl = falResult.data.image.url;
+        const resultUrl = swapResult.data?.image?.url ?? swapResult.data?.images?.[0]?.url;
+        if (!resultUrl) throw new Error('face-swap 결과 URL을 찾을 수 없습니다');
+
         const imgFetchRes = await fetch(resultUrl);
         if (!imgFetchRes.ok) throw new Error(`이미지 다운로드 실패 (${imgFetchRes.status})`);
         const imgBuffer = Buffer.from(await imgFetchRes.arrayBuffer());
