@@ -98,33 +98,50 @@ app.post('/api/composite', (req, res, next) => {
     console.log('[Composite] 프롬프트:', prompt);
 
     try {
-        // 1단계: InstantID로 얼굴 기반 전신 생성
-        console.log('[Composite] InstantID 전신 생성 중...');
-        const faceBase64 = `data:${faceFile.mimetype};base64,${faceFile.buffer.toString('base64')}`;
-        let instantOutput;
+        // 1단계: 전신 이미지 생성 (flux-dev)
+        console.log('[Composite] 1단계: 전신 생성 중...');
+        let fluxOutput;
         try {
-            instantOutput = await replicate.run(
-                'grandlineai/instant-id-photorealistic:03914a0c3326bf44383d0cd84b06822618af879229ce5d1d53bef38d93b68279',
-                {
-                    input: {
-                        image: faceBase64,
-                        prompt,
-                        negative_prompt: 'ugly, deformed, noisy, blurry, low quality, cartoon, anime, illustration, painting, disfigured, bad anatomy',
-                        width: 512,
-                        height: 768,
-                        ip_adapter_scale: 0.8,
-                        controlnet_conditioning_scale: 0.8,
-                        num_inference_steps: 30,
-                        guidance_scale: 7.5,
-                    },
-                }
-            );
+            fluxOutput = await replicate.run('black-forest-labs/flux-dev', {
+                input: { prompt, num_outputs: 1, aspect_ratio: '2:3', num_inference_steps: 28 },
+            });
         } catch (e) {
-            console.error('[Composite] InstantID 오류:', e);
-            return res.status(500).json({ error: '이미지 생성 실패: ' + (e?.message || String(e)) });
+            console.error('[Composite] flux-dev 오류:', e);
+            return res.status(500).json({ error: '전신 이미지 생성 실패: ' + (e?.message || String(e)) });
         }
-        console.log('[Composite] InstantID 출력:', typeof instantOutput, Array.isArray(instantOutput), instantOutput);
-        const resultRaw = Array.isArray(instantOutput) ? instantOutput[0] : instantOutput;
+        const bodyImageRaw = Array.isArray(fluxOutput) ? fluxOutput[0] : fluxOutput;
+        const bodyImageUrl = String(bodyImageRaw);
+        console.log('[Composite] 전신 URL:', bodyImageUrl);
+
+        // 2단계: 전신 이미지를 base64로 변환
+        const bodyFetchRes = await fetch(bodyImageUrl);
+        if (!bodyFetchRes.ok) throw new Error(`전신 이미지 다운로드 실패 (${bodyFetchRes.status})`);
+        const bodyBuffer = Buffer.from(await bodyFetchRes.arrayBuffer());
+        const bodyBase64 = `data:image/png;base64,${bodyBuffer.toString('base64')}`;
+
+        // 3단계: 얼굴 합성 (lucataco/faceswap - 고품질)
+        console.log('[Composite] 3단계: 얼굴 합성 중...');
+        const faceBase64 = `data:${faceFile.mimetype};base64,${faceFile.buffer.toString('base64')}`;
+        let swapOutput;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                swapOutput = await replicate.run(
+                    'lucataco/faceswap:9a4298548422074c3f57258c5d544497314ae4112df80d116f0d2109e843d20d',
+                    { input: { target_image: bodyBase64, swap_image: faceBase64 } }
+                );
+                break;
+            } catch (e) {
+                const is429 = e?.message?.includes('429') || e?.status === 429;
+                if (is429 && attempt < 3) {
+                    console.log(`[Composite] faceswap 429, ${attempt}회 재시도 대기 중...`);
+                    await new Promise(r => setTimeout(r, 8000));
+                    continue;
+                }
+                console.error('[Composite] faceswap 오류:', e);
+                return res.status(500).json({ error: '얼굴 합성 실패: ' + (e?.message || String(e)) });
+            }
+        }
+        const resultRaw = Array.isArray(swapOutput) ? swapOutput[0] : swapOutput;
         const resultUrl = String(resultRaw);
         console.log('[Composite] 결과 URL:', resultUrl);
 
