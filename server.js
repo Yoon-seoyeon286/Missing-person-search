@@ -99,62 +99,30 @@ app.post('/api/composite', (req, res, next) => {
     const outfit = outfitText || 'casual clothes';
 
     try {
-        // 1단계: gpt-image-1로 전신 이미지 생성 (얼굴은 generic placeholder)
-        console.log('[Composite] 1단계: gpt-image-1 전신 생성 중...');
-        const bodyPrompt = `Full body photograph of a ${bodyDesc} person, wearing ${outfit}. Complete full body shot showing entire person from head to toe including feet. Standing upright, facing forward, arms relaxed at sides. Professional studio photography, clean neutral gray background, soft even lighting. Photorealistic, real camera photo, sharp focus throughout entire body. The face is a generic neutral face - do not emphasize facial features.`;
-        let bodyImageBase64;
+        // gpt-image-1 images.edit: 얼굴 사진을 참조해 전신 생성
+        // ChatGPT 웹과 동일한 엔진 — 얼굴/헤어스타일/피부톤 그대로 유지
+        console.log('[Composite] gpt-image-1 images.edit 전신 생성 중...');
+        const { toFile } = require('openai');
+        const faceImageFile = await toFile(faceFile.buffer, 'face.png', { type: faceFile.mimetype });
+
+        let imageBase64;
         try {
-            const imageRes = await openai.images.generate({
+            const imageRes = await openai.images.edit({
                 model: 'gpt-image-1',
-                prompt: bodyPrompt,
-                n: 1,
+                image: faceImageFile,
+                prompt: `Full body photograph of this exact person. Preserve their face, hairstyle, and skin tone exactly as shown. The person is ${bodyDesc}, wearing ${outfit}. Complete full body shot from head to toe including feet. Standing straight, facing forward, arms at sides. Professional studio photography, clean neutral gray background, soft even studio lighting. Photorealistic, real camera photo, sharp focus.`,
                 size: '1024x1536',
                 quality: 'high',
+                n: 1,
             });
-            bodyImageBase64 = imageRes.data[0].b64_json;
-            console.log('[Composite] gpt-image-1 전신 생성 완료');
+            imageBase64 = imageRes.data[0].b64_json;
+            console.log('[Composite] 생성 완료');
         } catch (e) {
             console.error('[Composite] gpt-image-1 오류:', e);
-            return res.status(500).json({ error: '전신 이미지 생성 실패: ' + (e?.message || String(e)) });
+            return res.status(500).json({ error: '이미지 생성 실패: ' + (e?.message || String(e)) });
         }
 
-        // 2단계: 얼굴 사진 + 전신 이미지를 fal.ai 스토리지에 업로드
-        console.log('[Composite] 2단계: 이미지 업로드 중...');
-        const { Blob } = require('node:buffer');
-
-        const faceBlob = new Blob([faceFile.buffer], { type: faceFile.mimetype });
-        const bodyBuffer = Buffer.from(bodyImageBase64, 'base64');
-        const bodyBlob = new Blob([bodyBuffer], { type: 'image/png' });
-
-        const [faceUrl, bodyUrl] = await Promise.all([
-            fal.storage.upload(faceBlob),
-            fal.storage.upload(bodyBlob),
-        ]);
-        console.log('[Composite] 얼굴 URL:', faceUrl);
-        console.log('[Composite] 전신 URL:', bodyUrl);
-
-        // 3단계: fal-ai/face-swap으로 얼굴 합성
-        console.log('[Composite] 3단계: face-swap 합성 중...');
-        let swapResult;
-        try {
-            swapResult = await fal.subscribe('fal-ai/face-swap', {
-                input: {
-                    base_image_url: bodyUrl,
-                    swap_image_url: faceUrl,
-                },
-            });
-        } catch (e) {
-            console.error('[Composite] face-swap 오류:', e);
-            return res.status(500).json({ error: '얼굴 합성 실패: ' + (e?.message || String(e)) });
-        }
-        console.log('[Composite] face-swap 완료:', swapResult.data);
-
-        const resultUrl = swapResult.data?.image?.url ?? swapResult.data?.images?.[0]?.url;
-        if (!resultUrl) throw new Error('face-swap 결과 URL을 찾을 수 없습니다');
-
-        const imgFetchRes = await fetch(resultUrl);
-        if (!imgFetchRes.ok) throw new Error(`이미지 다운로드 실패 (${imgFetchRes.status})`);
-        const imgBuffer = Buffer.from(await imgFetchRes.arrayBuffer());
+        const imgBuffer = Buffer.from(imageBase64, 'base64');
         const id = uuidv4();
         fs.writeFileSync(path.join(UPLOADS_DIR, id + '.png'), imgBuffer);
 
