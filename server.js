@@ -96,7 +96,32 @@ app.post('/api/composite', (req, res, next) => {
     if (!bodyDesc) return res.status(400).json({ error: '신체 정보를 입력해주세요' });
 
     const outfit = outfitText || 'casual clothes';
-    const prompt = `A full-body professional photograph of the exact same person in the reference image. Preserve their face, hairstyle, and skin tone exactly. The person is ${bodyDesc}, wearing ${outfit}, standing naturally facing forward. Shot in a photography studio with soft neutral background and professional lighting. Realistic skin texture, sharp detail, looks like a real camera photo, not an illustration or drawing. Show the complete body from head to toe.`;
+    const prompt = `
+This image MUST depict the SAME INDIVIDUAL as the reference image.
+Identity consistency is mandatory and non-negotiable.
+
+Do NOT alter facial structure, including eye shape, eye spacing,
+nose width, nose bridge, lip shape, jawline, cheekbone structure,
+head size, or proportions.
+
+No face beautification, no generic features, no face averaging,
+no idealization, no model-like appearance.
+
+A full-body professional photograph of the exact same person
+shown in the reference image.
+Preserve face, hairstyle, skin tone, and age exactly.
+
+The person is ${bodyDesc}, wearing ${outfit},
+standing naturally facing forward.
+
+Shot in a photography studio with soft neutral background
+and professional lighting.
+
+Realistic skin texture, sharp detail.
+Indistinguishable from a real camera photo.
+Not an illustration, not a drawing.
+Show the complete body from head to toe.
+`;
     console.log('[Composite] 프롬프트:', prompt);
 
     try {
