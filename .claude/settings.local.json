@@ -26,7 +26,8 @@
       "WebFetch(domain:api.replicate.com)",
       "Bash(git remote set-url origin https://github.com/Yoon-seoyeon286/Missing-person-search.git)",
       "Bash(git add -A)",
-      "Bash(npm install openai)"
+      "Bash(npm install openai)",
+      "WebFetch(domain:fal.ai)"
     ],
     "additionalDirectories": [
       "c:\\Users\\panop\\Desktop\\works\\tossinapp-ar\\ar-vision\\public"

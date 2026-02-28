@@ -140,7 +140,7 @@ app.post('/api/composite', (req, res, next) => {
             swapResult = await fal.subscribe('fal-ai/face-swap', {
                 input: {
                     base_image_url: bodyUrl,
-                    face_image_url: faceUrl,
+                    swap_image_url: faceUrl,
                 },
             });
         } catch (e) {
