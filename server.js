@@ -7,6 +7,7 @@ const { v4: uuidv4 } = require('uuid'); //랜덤한 이름 만들기
 const OpenAI = require('openai');
 const { toFile } = require('openai');
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+if (!globalThis.File) globalThis.File = require('node:buffer').File;
 
 const app = express(); //서버 객체
 const PORT = process.env.PORT || 3000;
