@@ -5,6 +5,7 @@ const fs = require('fs'); //파일을 만들거나 읽는 도구
 const multer = require('multer'); // 사용자가 보낸 이미지 파일을 해석해서 저장
 const { v4: uuidv4 } = require('uuid'); //랜덤한 이름 만들기
 const OpenAI = require('openai');
+const { toFile } = require('openai');
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const app = express(); //서버 객체
@@ -100,7 +101,7 @@ app.post('/api/composite', (req, res, next) => {
     try {
         // gpt-image-1로 얼굴 기반 전신 이미지 생성
         console.log('[Composite] gpt-image-1 생성 중...');
-        const imageFile = new File([faceFile.buffer], 'face.png', { type: faceFile.mimetype });
+        const imageFile = await toFile(faceFile.buffer, 'face.png', { type: faceFile.mimetype });
         let response;
         try {
             response = await openai.images.edit({
