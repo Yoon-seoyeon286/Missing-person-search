@@ -87,11 +87,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         btnComposite.disabled = true;
-        btnComposite.textContent = '합성 중... (약 30~60초)';
+        btnComposite.textContent = '생성 중... (약 30~60초)';
 
         try {
-            // 1단계: AI 합성
-            btnComposite.textContent = '합성 중... (약 30~60초)';
+            // 1단계: AI 생성
+            btnComposite.textContent = '생성 중... (약 30~60초)';
             const res = await fetch('/api/composite', { method: 'POST', body: formData });
             if (!res.ok) {
                 const { error } = await res.json();
