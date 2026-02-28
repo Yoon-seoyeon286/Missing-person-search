@@ -105,7 +105,7 @@ app.post('/api/composite', (req, res, next) => {
         try {
             instantOutput = await replicate.run('zsxkib/instant-id', {
                 input: {
-                    face_image: faceBase64,
+                    image: faceBase64,
                     prompt,
                     negative_prompt: 'ugly, deformed, noisy, blurry, low quality, cartoon, anime, illustration, painting, disfigured, bad anatomy',
                     ip_adapter_scale: 0.8,
