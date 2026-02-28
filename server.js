@@ -4,8 +4,8 @@ const path = require('path');
 const fs = require('fs'); //파일을 만들거나 읽는 도구
 const multer = require('multer'); // 사용자가 보낸 이미지 파일을 해석해서 저장
 const { v4: uuidv4 } = require('uuid'); //랜덤한 이름 만들기
-const Replicate = require('replicate');
-const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
+const OpenAI = require('openai');
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const app = express(); //서버 객체
 const PORT = process.env.PORT || 3000;
@@ -98,58 +98,24 @@ app.post('/api/composite', (req, res, next) => {
     console.log('[Composite] 프롬프트:', prompt);
 
     try {
-        // 1단계: 전신 이미지 생성 (flux-dev)
-        console.log('[Composite] 1단계: 전신 생성 중...');
-        let fluxOutput;
+        // gpt-image-1로 얼굴 기반 전신 이미지 생성
+        console.log('[Composite] gpt-image-1 생성 중...');
+        const imageFile = new File([faceFile.buffer], 'face.png', { type: faceFile.mimetype });
+        let response;
         try {
-            fluxOutput = await replicate.run('black-forest-labs/flux-dev', {
-                input: { prompt, num_outputs: 1, aspect_ratio: '2:3', num_inference_steps: 28 },
+            response = await openai.images.edit({
+                model: 'gpt-image-1',
+                image: imageFile,
+                prompt,
+                size: '1024x1536',
+                n: 1,
             });
         } catch (e) {
-            console.error('[Composite] flux-dev 오류:', e);
-            return res.status(500).json({ error: '전신 이미지 생성 실패: ' + (e?.message || String(e)) });
+            console.error('[Composite] gpt-image-1 오류:', e);
+            return res.status(500).json({ error: '이미지 생성 실패: ' + (e?.message || String(e)) });
         }
-        const bodyImageRaw = Array.isArray(fluxOutput) ? fluxOutput[0] : fluxOutput;
-        const bodyImageUrl = String(bodyImageRaw);
-        console.log('[Composite] 전신 URL:', bodyImageUrl);
-
-        // 2단계: 전신 이미지를 base64로 변환
-        const bodyFetchRes = await fetch(bodyImageUrl);
-        if (!bodyFetchRes.ok) throw new Error(`전신 이미지 다운로드 실패 (${bodyFetchRes.status})`);
-        const bodyBuffer = Buffer.from(await bodyFetchRes.arrayBuffer());
-        const bodyBase64 = `data:image/png;base64,${bodyBuffer.toString('base64')}`;
-
-        // 3단계: 얼굴 합성 (lucataco/faceswap - 고품질)
-        console.log('[Composite] 3단계: 얼굴 합성 중...');
-        const faceBase64 = `data:${faceFile.mimetype};base64,${faceFile.buffer.toString('base64')}`;
-        let swapOutput;
-        for (let attempt = 1; attempt <= 3; attempt++) {
-            try {
-                swapOutput = await replicate.run(
-                    'lucataco/faceswap:9a4298548422074c3f57258c5d544497314ae4112df80d116f0d2109e843d20d',
-                    { input: { target_image: bodyBase64, swap_image: faceBase64 } }
-                );
-                break;
-            } catch (e) {
-                const is429 = e?.message?.includes('429') || e?.status === 429;
-                if (is429 && attempt < 3) {
-                    console.log(`[Composite] faceswap 429, ${attempt}회 재시도 대기 중...`);
-                    await new Promise(r => setTimeout(r, 8000));
-                    continue;
-                }
-                console.error('[Composite] faceswap 오류:', e);
-                return res.status(500).json({ error: '얼굴 합성 실패: ' + (e?.message || String(e)) });
-            }
-        }
-        const resultRaw = Array.isArray(swapOutput) ? swapOutput[0] : swapOutput;
-        const resultUrl = String(resultRaw);
-        console.log('[Composite] 결과 URL:', resultUrl);
-
-        // 3단계: 결과 저장
-        console.log('[Composite] 3단계: 결과 저장 중...');
-        const imgRes = await fetch(resultUrl);
-        if (!imgRes.ok) throw new Error(`이미지 다운로드 실패 (${imgRes.status})`);
-        const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
+        console.log('[Composite] gpt-image-1 완료');
+        const imgBuffer = Buffer.from(response.data[0].b64_json, 'base64');
         const id = uuidv4();
         fs.writeFileSync(path.join(UPLOADS_DIR, id + '.png'), imgBuffer);
 
