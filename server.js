@@ -51,7 +51,6 @@ const compositeUpload = multer({
 // [카메라 권한 설정]
 function setPermissionHeaders(res) {
     res.setHeader('Permissions-Policy', 'camera=(self)');
-    // Access-Control-Allow-Origin: 프론트/백이 같은 서버이므로 불필요
     // 외부 도메인에서 API 호출이 필요한 경우 납품처에서 추가
 }
 
@@ -74,7 +73,7 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
 });
 
 // [메뉴 1-2: 합성 이미지 생성]
-// POST /api/composite  multipart { face: File, outfit?: File, height, weight, age, outfitText? }
+
 const compositeFields = compositeUpload.fields([
     { name: 'face', maxCount: 1 },
     { name: 'outfit', maxCount: 1 },
@@ -103,7 +102,7 @@ app.post('/api/composite', (req, res, next) => {
         // 옷차림 결정: 텍스트 > 사진 묘사 > 기본값
         let outfit = outfitText?.trim();
         if (outfit) {
-            // 한국어 등 비영어 입력 → 영어로 번역
+            // 한국어 영어로 번역
             const transRes = await openai.chat.completions.create({
                 model: 'gpt-4o-mini',
                 messages: [{ role: 'user', content: `Translate this clothing description to English in one short sentence (only the clothes): "${outfit}"` }],
