@@ -102,6 +102,16 @@ app.post('/api/composite', (req, res, next) => {
     try {
         // 옷차림 결정: 텍스트 > 사진 묘사 > 기본값
         let outfit = outfitText?.trim();
+        if (outfit) {
+            // 한국어 등 비영어 입력 → 영어로 번역
+            const transRes = await openai.chat.completions.create({
+                model: 'gpt-4o-mini',
+                messages: [{ role: 'user', content: `Translate this clothing description to English in one short sentence (only the clothes): "${outfit}"` }],
+                max_tokens: 60,
+            });
+            outfit = transRes.choices[0].message.content;
+            console.log('[Composite] 옷차림 영어 번역:', outfit);
+        }
         if (!outfit && outfitFile) {
             console.log('[Composite] 옷차림 사진 분석 중...');
             const outfitBase64 = `data:${outfitFile.mimetype};base64,${outfitFile.buffer.toString('base64')}`;
