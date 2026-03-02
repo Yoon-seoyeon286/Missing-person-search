@@ -9,8 +9,6 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 if (!globalThis.File) globalThis.File = require('node:buffer').File;
 const { fal } = require('@fal-ai/client');
 fal.config({ credentials: process.env.FAL_KEY });
-const Replicate = require('replicate');
-const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
 
 const app = express(); //서버 객체
 const PORT = process.env.PORT || 3000;
@@ -118,51 +116,34 @@ app.post('/api/composite', (req, res, next) => {
         }
         if (!outfit) outfit = 'casual clothes';
 
-        // gpt-image-1 images.edit: 얼굴 사진 참조 → 전신 생성
-        console.log('[Composite] gpt-image-1 전신 생성 중...');
-        const { toFile } = require('openai');
-        const faceImageFile = await toFile(faceFile.buffer, 'face.png', { type: faceFile.mimetype });
+        // 얼굴 사진 fal.ai 스토리지 업로드
+        console.log('[Composite] 얼굴 사진 업로드 중...');
+        const { Blob } = require('node:buffer');
+        const faceUrl = await fal.storage.upload(new Blob([faceFile.buffer], { type: faceFile.mimetype }));
+        console.log('[Composite] 업로드 완료:', faceUrl);
 
-        let imageBase64;
+        // fal-ai/flux-pulid: 얼굴 보존하면서 전신 생성 (한 번에)
+        console.log('[Composite] flux-pulid 전신 생성 중...');
+        let falResult;
         try {
-            const imageRes = await openai.images.edit({
-                model: 'gpt-image-1',
-                image: faceImageFile,
-                prompt: `Full body photo of this person (${bodyDesc}), wearing ${outfit}. Show the entire body from head to toe.`,
-                size: '1024x1536',
-                quality: 'high',
-                n: 1,
+            falResult = await fal.subscribe('fal-ai/flux-pulid', {
+                input: {
+                    reference_image_url: faceUrl,
+                    prompt: `Full body photograph of a ${bodyDesc} person, wearing ${outfit}. Complete full body from head to toe. Shot on Canon EOS R5, 85mm lens, photorealistic, realistic skin texture, studio lighting, neutral background.`,
+                    negative_prompt: 'cartoon, illustration, anime, drawing, painting, deformed, ugly, blurry, cropped',
+                    image_size: { width: 768, height: 1152 },
+                    num_inference_steps: 25,
+                    id_weight: 1.0,
+                },
             });
-            imageBase64 = imageRes.data[0].b64_json;
-            console.log('[Composite] 생성 완료');
         } catch (e) {
-            console.error('[Composite] gpt-image-1 오류:', e);
+            console.error('[Composite] flux-pulid 오류:', e);
             return res.status(500).json({ error: '이미지 생성 실패: ' + (e?.message || String(e)) });
         }
+        console.log('[Composite] flux-pulid 완료:', falResult.data);
 
-        // face-swap: 생성된 전신에 원본 얼굴 합성
-        console.log('[Composite] face-swap 중...');
-        const { Blob } = require('node:buffer');
-        const [faceUrl, bodyUrl] = await Promise.all([
-            fal.storage.upload(new Blob([faceFile.buffer], { type: faceFile.mimetype })),
-            fal.storage.upload(new Blob([Buffer.from(imageBase64, 'base64')], { type: 'image/png' })),
-        ]);
-        console.log('[Composite] 업로드 완료 - 얼굴:', faceUrl, '전신:', bodyUrl);
-
-        let swapOutput;
-        try {
-            swapOutput = await replicate.run('cdingram/face-swap', {
-                input: { source_image: faceUrl, target_image: bodyUrl },
-            });
-        } catch (e) {
-            console.error('[Composite] face-swap 오류:', e);
-            return res.status(500).json({ error: '얼굴 합성 실패: ' + (e?.message || String(e)) });
-        }
-        console.log('[Composite] face-swap 완료:', swapOutput);
-
-        // swapOutput은 URL 문자열 또는 ReadableStream
-        const resultUrl = typeof swapOutput === 'string' ? swapOutput : swapOutput?.[0] ?? swapOutput?.url;
-        if (!resultUrl) throw new Error('face-swap 결과 URL 없음');
+        const resultUrl = falResult.data?.images?.[0]?.url;
+        if (!resultUrl) throw new Error('결과 URL 없음');
 
         const swapFetchRes = await fetch(resultUrl);
         if (!swapFetchRes.ok) throw new Error(`결과 다운로드 실패 (${swapFetchRes.status})`);
