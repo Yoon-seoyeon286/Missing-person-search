@@ -9,6 +9,8 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 if (!globalThis.File) globalThis.File = require('node:buffer').File;
 const { fal } = require('@fal-ai/client');
 fal.config({ credentials: process.env.FAL_KEY });
+const Replicate = require('replicate');
+const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
 
 const app = express(); //서버 객체
 const PORT = process.env.PORT || 3000;
@@ -122,27 +124,29 @@ app.post('/api/composite', (req, res, next) => {
         const faceUrl = await fal.storage.upload(new Blob([faceFile.buffer], { type: faceFile.mimetype }));
         console.log('[Composite] 업로드 완료:', faceUrl);
 
-        // fal-ai/flux-pulid: 얼굴 보존하면서 전신 생성 (한 번에)
+        // bytedance/flux-pulid (Replicate): 얼굴 보존하면서 전신 생성
         console.log('[Composite] flux-pulid 전신 생성 중...');
-        let falResult;
+        let replicateOutput;
         try {
-            falResult = await fal.subscribe('fal-ai/flux-pulid', {
+            replicateOutput = await replicate.run('bytedance/flux-pulid', {
                 input: {
-                    reference_image_url: faceUrl,
+                    main_face_image: faceUrl,
                     prompt: `Full body photograph of a ${bodyDesc} person, wearing ${outfit}. Complete full body from head to toe. Shot on Canon EOS R5, 85mm lens, photorealistic, realistic skin texture, studio lighting, neutral background.`,
                     negative_prompt: 'cartoon, illustration, anime, drawing, painting, deformed, ugly, blurry, cropped',
-                    image_size: { width: 768, height: 1152 },
-                    num_inference_steps: 25,
+                    width: 768,
+                    height: 1152,
+                    num_steps: 20,
                     id_weight: 1.0,
+                    guidance_scale: 4,
                 },
             });
         } catch (e) {
             console.error('[Composite] flux-pulid 오류:', e);
             return res.status(500).json({ error: '이미지 생성 실패: ' + (e?.message || String(e)) });
         }
-        console.log('[Composite] flux-pulid 완료:', falResult.data);
+        console.log('[Composite] flux-pulid 완료:', replicateOutput);
 
-        const resultUrl = falResult.data?.images?.[0]?.url;
+        const resultUrl = Array.isArray(replicateOutput) ? replicateOutput[0] : replicateOutput;
         if (!resultUrl) throw new Error('결과 URL 없음');
 
         const swapFetchRes = await fetch(resultUrl);
@@ -189,7 +193,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
 }));
 
 
-app.get('{*path}', (req, res) => {
+app.get('{*path}', (_req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
