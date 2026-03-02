@@ -145,7 +145,7 @@ app.post('/api/composite', (req, res, next) => {
                     negative_prompt: 'cartoon, illustration, anime, drawing, painting, digital art, CGI, 3D render, painterly, oil painting, watercolor, airbrushed, plastic skin, smooth skin, overprocessed, deformed, ugly, blurry, cropped, low quality, worst quality, nsfw',
                     width: 768,
                     height: 1152,
-                    num_steps: 28,
+                    num_steps: 20,
                     id_weight: 1.0,
                     guidance_scale: 3.5,
                     true_cfg: 1.5,
