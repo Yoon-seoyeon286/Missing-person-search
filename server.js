@@ -124,11 +124,11 @@ app.post('/api/composite', (req, res, next) => {
         const faceUrl = await fal.storage.upload(new Blob([faceFile.buffer], { type: faceFile.mimetype }));
         console.log('[Composite] 업로드 완료:', faceUrl);
 
-        // bytedance/flux-pulid (Replicate): 얼굴 보존하면서 전신 생성
+        // zsxkib/flux-pulid (Replicate): 얼굴 보존하면서 전신 생성
         console.log('[Composite] flux-pulid 전신 생성 중...');
         let replicateOutput;
         try {
-            replicateOutput = await replicate.run('bytedance/flux-pulid', {
+            replicateOutput = await replicate.run('zsxkib/flux-pulid:8baa7ef2255075b46f4d91cd238c21d31181b3e6a864463f967960bb0112525b', {
                 input: {
                     main_face_image: faceUrl,
                     prompt: `Full body photograph of a ${bodyDesc} person, wearing ${outfit}. Complete full body from head to toe. Shot on Canon EOS R5, 85mm lens, photorealistic, realistic skin texture, studio lighting, neutral background.`,
