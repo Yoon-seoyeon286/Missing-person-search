@@ -227,6 +227,37 @@ app.get('/api/image/:id', (req, res) => {
 });
 
 
+// [관리: 이미지 목록 조회]
+// GET /api/images
+app.get('/api/images', (_req, res) => {
+    const files = fs.readdirSync(UPLOADS_DIR)
+        .filter(f => f.endsWith('.png'))
+        .map(f => {
+            const { mtimeMs } = fs.statSync(path.join(UPLOADS_DIR, f));
+            return { id: path.basename(f, '.png'), createdAt: mtimeMs };
+        })
+        .sort((a, b) => b.createdAt - a.createdAt);
+    res.json(files);
+});
+
+// [관리: 이미지 수동 삭제]
+// DELETE /api/image/:id
+app.delete('/api/image/:id', (req, res) => {
+    const raw = req.params.id;
+    if (!/^[0-9a-f-]{36}$/.test(raw)) {
+        return res.status(400).json({ error: '잘못된 ID 형식입니다' });
+    }
+    const filePath = path.join(UPLOADS_DIR, raw + '.png');
+    if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: '이미지를 찾을 수 없습니다' });
+    }
+    fs.unlink(filePath, (err) => {
+        if (err) return res.status(500).json({ error: '삭제 실패' });
+        res.json({ ok: true });
+    });
+});
+
+
 app.use(express.static(path.join(__dirname, 'public'), {
     setHeaders: (res) => setPermissionHeaders(res),
 }));
