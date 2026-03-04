@@ -23,6 +23,31 @@ if (!fs.existsSync(UPLOADS_DIR)) {
     fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 
+// [자동 삭제]
+const EXPIRE_MS = 24 * 60 * 60 * 1000; // 24시간
+
+function scheduleDelete(filePath) {
+    setTimeout(() => {
+        fs.unlink(filePath, (err) => {
+            if (!err) console.log('[Auto-delete]', path.basename(filePath));
+        });
+    }, EXPIRE_MS);
+}
+
+// 서버 시작 시 24시간 이상 된 파일 정리
+(function cleanupOldFiles() {
+    const now = Date.now();
+    fs.readdirSync(UPLOADS_DIR).forEach(file => {
+        const filePath = path.join(UPLOADS_DIR, file);
+        const { mtimeMs } = fs.statSync(filePath);
+        if (now - mtimeMs > EXPIRE_MS) {
+            fs.unlink(filePath, () => {});
+        } else {
+            scheduleDelete(filePath);
+        }
+    });
+})();
+
 // [multer 설정]
 // 파일명 = UUID.png 
 const storage = multer.diskStorage({
@@ -65,6 +90,7 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
         return res.status(400).json({ error: '이미지가 없습니다' });
     }
     const id = path.basename(req.file.filename, '.png');
+    scheduleDelete(req.file.path);
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     res.json({
         id,
@@ -128,6 +154,7 @@ app.post('/api/composite', (req, res, next) => {
         if (!outfit) outfit = 'casual clothes';
 
         // 얼굴 사진 fal.ai 스토리지 업로드
+        //교체: S3/R2 presigned URL 또는 직접 업로드 후 공개 URL 반환
         console.log('[Composite] 얼굴 사진 업로드 중...');
         const { Blob } = require('node:buffer');
         const faceUrl = await fal.storage.upload(new Blob([faceFile.buffer], { type: faceFile.mimetype }));
@@ -164,7 +191,9 @@ app.post('/api/composite', (req, res, next) => {
         const finalBuffer = Buffer.from(await swapFetchRes.arrayBuffer());
 
         const id = uuidv4();
-        fs.writeFileSync(path.join(UPLOADS_DIR, id + '.png'), finalBuffer);
+        const savedPath = path.join(UPLOADS_DIR, id + '.png');
+        fs.writeFileSync(savedPath, finalBuffer);
+        scheduleDelete(savedPath);
 
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         res.json({ id, url: `${baseUrl}/ar.html?id=${id}` });
