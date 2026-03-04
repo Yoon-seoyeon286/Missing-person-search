@@ -167,10 +167,10 @@ app.post('/api/composite', (req, res, next) => {
             replicateOutput = await replicate.run('zsxkib/flux-pulid:8baa7ef2255075b46f4d91cd238c21d31181b3e6a864463f967960bb0112525b', {
                 input: {
                     main_face_image: faceUrl,
-                    prompt: `RAW photo, full body portrait of a ${bodyDesc} person, wearing ${outfit}, standing, full body from head to toe. Shot on Canon EOS R5, 85mm f/1.4 lens, hyperrealistic, ultra-detailed, realistic skin pores, natural skin texture, subsurface scattering, sharp focus, 8k uhd, film grain, professional studio lighting, neutral gray background.`,
-                    negative_prompt: 'cartoon, illustration, anime, drawing, painting, digital art, CGI, 3D render, painterly, oil painting, watercolor, airbrushed, plastic skin, smooth skin, overprocessed, deformed, ugly, blurry, cropped, low quality, worst quality, nsfw',
+                    prompt: `RAW photo, full body shot of a ${bodyDesc} person, wearing ${outfit}, standing upright, entire body visible from head to toe including feet and shoes, full length, wide shot, feet on ground, neutral gray background, studio lighting, photorealistic, 8k.`,
+                    negative_prompt: 'cartoon, illustration, anime, drawing, painting, digital art, CGI, 3D render, cropped body, cut off feet, cut off legs, partial body, headshot, portrait, close-up, waist up, half body, missing feet, floating, bad anatomy, deformed, ugly, blurry, low quality, worst quality, nsfw',
                     width: 768,
-                    height: 1152,
+                    height: 1280,
                     num_steps: 20,
                     id_weight: 1.0,
                     guidance_scale: 3.5,
