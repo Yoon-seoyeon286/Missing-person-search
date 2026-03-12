@@ -157,14 +157,27 @@ app.post('/api/composite', (req, res, next) => {
         //교체: S3/R2 presigned URL 또는 직접 업로드 후 공개 URL 반환
         console.log('[Composite] 얼굴 사진 업로드 중...');
         const { Blob } = require('node:buffer');
-        const faceUrl = await fal.storage.upload(new Blob([faceFile.buffer], { type: faceFile.mimetype }));
-        console.log('[Composite] 업로드 완료:', faceUrl);
+        const rawFaceUrl = await fal.storage.upload(new Blob([faceFile.buffer], { type: faceFile.mimetype }));
+        console.log('[Composite] 업로드 완료:', rawFaceUrl);
 
-        // zsxkib/flux-pulid (Replicate): 얼굴 보존하면서 전신 생성
+        // [1단계] Real-ESRGAN 2x: 얼굴 사진 업스케일 (저화질 개선)
+        console.log('[Composite] 얼굴 사진 업스케일 중...');
+        let faceUrl = rawFaceUrl;
+        try {
+            const upscaledFace = await replicate.run('nightmareai/real-esrgan', {
+                input: { image: rawFaceUrl, scale: 2, face_enhance: true },
+            });
+            faceUrl = String(upscaledFace);
+            console.log('[Composite] 얼굴 업스케일 완료:', faceUrl);
+        } catch (e) {
+            console.warn('[Composite] 얼굴 업스케일 실패, 원본 사용:', e.message);
+        }
+
+        // [2단계] zsxkib/flux-pulid: 얼굴 보존하면서 전신 생성
         console.log('[Composite] flux-pulid 전신 생성 중...');
         let replicateOutput;
         try {
-            replicateOutput = await replicate.run('zsxkib/flux-pulid:8baa7ef2255075b46f4d91cd238c21d31181b3e6a864463f967960bb0112525b', {
+            replicateOutput = await replicate.run('zsxkib/flux-pulid', {
                 input: {
                     main_face_image: faceUrl,
                     prompt: `RAW photo, full body shot of a ${bodyDesc} person, wearing ${outfit}, standing upright, entire body visible from head to toe including feet and shoes, full length, wide shot, feet on ground, neutral gray background, studio lighting, photorealistic, 8k.`,
@@ -183,8 +196,21 @@ app.post('/api/composite', (req, res, next) => {
         }
         console.log('[Composite] flux-pulid 완료:', replicateOutput);
 
-        const resultUrl = Array.isArray(replicateOutput) ? replicateOutput[0] : replicateOutput;
-        if (!resultUrl) throw new Error('결과 URL 없음');
+        const generatedUrl = Array.isArray(replicateOutput) ? replicateOutput[0] : replicateOutput;
+        if (!generatedUrl) throw new Error('결과 URL 없음');
+
+        // [3단계] Real-ESRGAN 2x: 최종 결과 이미지 업스케일
+        console.log('[Composite] 결과 이미지 업스케일 중...');
+        let resultUrl = generatedUrl;
+        try {
+            const upscaledOutput = await replicate.run('nightmareai/real-esrgan', {
+                input: { image: generatedUrl, scale: 2, face_enhance: false },
+            });
+            resultUrl = String(upscaledOutput);
+            console.log('[Composite] 출력 업스케일 완료:', resultUrl);
+        } catch (e) {
+            console.warn('[Composite] 출력 업스케일 실패, 원본 사용:', e.message);
+        }
 
         const swapFetchRes = await fetch(resultUrl);
         if (!swapFetchRes.ok) throw new Error(`결과 다운로드 실패 (${swapFetchRes.status})`);
