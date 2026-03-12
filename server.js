@@ -153,11 +153,29 @@ app.post('/api/composite', (req, res, next) => {
         }
         if (!outfit) outfit = 'casual clothes';
 
+        // 얼굴 사진 업스케일링 (화질 개선)
+        console.log('[Composite] 얼굴 사진 업스케일링 중...');
+        const { Blob } = require('node:buffer');
+        let faceBuffer = faceFile.buffer;
+        try {
+            const upscaleBase64 = `data:${faceFile.mimetype};base64,${faceFile.buffer.toString('base64')}`;
+            const upscaleOutput = await replicate.run('nightmareai/real-esrgan:f121d640bd286e1fdc67f9799164c1d5be36ff74576ee2d96b1c9b1be498f4e5', {
+                input: { image: upscaleBase64, scale: 2, face_enhance: true },
+            });
+            const upscaleUrl = Array.isArray(upscaleOutput) ? upscaleOutput[0] : upscaleOutput;
+            const upscaleFetch = await fetch(upscaleUrl);
+            if (upscaleFetch.ok) {
+                faceBuffer = Buffer.from(await upscaleFetch.arrayBuffer());
+                console.log('[Composite] 업스케일링 완료');
+            }
+        } catch (e) {
+            console.warn('[Composite] 업스케일링 실패, 원본 사용:', e?.message);
+        }
+
         // 얼굴 사진 fal.ai 스토리지 업로드
         //교체: S3/R2 presigned URL 또는 직접 업로드 후 공개 URL 반환
         console.log('[Composite] 얼굴 사진 업로드 중...');
-        const { Blob } = require('node:buffer');
-        const faceUrl = await fal.storage.upload(new Blob([faceFile.buffer], { type: faceFile.mimetype }));
+        const faceUrl = await fal.storage.upload(new Blob([faceBuffer], { type: faceFile.mimetype }));
         console.log('[Composite] 업로드 완료:', faceUrl);
 
         // zsxkib/flux-pulid (Replicate): 얼굴 보존하면서 전신 생성
