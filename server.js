@@ -11,6 +11,7 @@ const { fal } = require('@fal-ai/client');
 fal.config({ credentials: process.env.FAL_KEY });
 const Replicate = require('replicate');
 const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
+const sharp = require('sharp');
 
 const app = express(); //서버 객체
 const PORT = process.env.PORT || 3000;
@@ -153,25 +154,21 @@ app.post('/api/composite', (req, res, next) => {
         }
         if (!outfit) outfit = 'casual clothes';
 
+        // [1단계] Sharp 2x: 얼굴 사진 업스케일 (로컬, 무료)
+        console.log('[Composite] 얼굴 사진 업스케일 중...');
+        const { width: faceW, height: faceH } = await sharp(faceFile.buffer).metadata();
+        const upscaledFaceBuffer = await sharp(faceFile.buffer)
+            .resize(faceW * 2, faceH * 2, { kernel: sharp.kernel.lanczos3 })
+            .sharpen()
+            .toBuffer();
+        console.log('[Composite] 얼굴 업스케일 완료');
+
         // 얼굴 사진 fal.ai 스토리지 업로드
         //교체: S3/R2 presigned URL 또는 직접 업로드 후 공개 URL 반환
         console.log('[Composite] 얼굴 사진 업로드 중...');
         const { Blob } = require('node:buffer');
-        const rawFaceUrl = await fal.storage.upload(new Blob([faceFile.buffer], { type: faceFile.mimetype }));
-        console.log('[Composite] 업로드 완료:', rawFaceUrl);
-
-        // [1단계] Real-ESRGAN 2x: 얼굴 사진 업스케일 (저화질 개선)
-        console.log('[Composite] 얼굴 사진 업스케일 중...');
-        let faceUrl = rawFaceUrl;
-        try {
-            const upscaledFace = await replicate.run('nightmareai/real-esrgan', {
-                input: { image: rawFaceUrl, scale: 2, face_enhance: true },
-            });
-            faceUrl = String(upscaledFace);
-            console.log('[Composite] 얼굴 업스케일 완료:', faceUrl);
-        } catch (e) {
-            console.warn('[Composite] 얼굴 업스케일 실패, 원본 사용:', e.message);
-        }
+        const faceUrl = await fal.storage.upload(new Blob([upscaledFaceBuffer], { type: faceFile.mimetype }));
+        console.log('[Composite] 업로드 완료:', faceUrl);
 
         // [2단계] zsxkib/flux-pulid: 얼굴 보존하면서 전신 생성
         console.log('[Composite] flux-pulid 전신 생성 중...');
@@ -199,22 +196,19 @@ app.post('/api/composite', (req, res, next) => {
         const generatedUrl = Array.isArray(replicateOutput) ? replicateOutput[0] : replicateOutput;
         if (!generatedUrl) throw new Error('결과 URL 없음');
 
-        // [3단계] Real-ESRGAN 2x: 최종 결과 이미지 업스케일
-        console.log('[Composite] 결과 이미지 업스케일 중...');
-        let resultUrl = generatedUrl;
-        try {
-            const upscaledOutput = await replicate.run('nightmareai/real-esrgan', {
-                input: { image: generatedUrl, scale: 2, face_enhance: false },
-            });
-            resultUrl = String(upscaledOutput);
-            console.log('[Composite] 출력 업스케일 완료:', resultUrl);
-        } catch (e) {
-            console.warn('[Composite] 출력 업스케일 실패, 원본 사용:', e.message);
-        }
-
-        const swapFetchRes = await fetch(resultUrl);
+        const swapFetchRes = await fetch(generatedUrl);
         if (!swapFetchRes.ok) throw new Error(`결과 다운로드 실패 (${swapFetchRes.status})`);
-        const finalBuffer = Buffer.from(await swapFetchRes.arrayBuffer());
+        const downloadedBuffer = Buffer.from(await swapFetchRes.arrayBuffer());
+
+        // [3단계] Sharp 2x: 결과 이미지 업스케일 (로컬, 무료)
+        console.log('[Composite] 결과 이미지 업스케일 중...');
+        const { width: outW, height: outH } = await sharp(downloadedBuffer).metadata();
+        const finalBuffer = await sharp(downloadedBuffer)
+            .resize(outW * 2, outH * 2, { kernel: sharp.kernel.lanczos3 })
+            .sharpen()
+            .png()
+            .toBuffer();
+        console.log('[Composite] 출력 업스케일 완료');
 
         const id = uuidv4();
         const savedPath = path.join(UPLOADS_DIR, id + '.png');
