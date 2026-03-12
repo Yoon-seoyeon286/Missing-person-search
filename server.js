@@ -193,12 +193,11 @@ app.post('/api/composite', (req, res, next) => {
         }
         console.log('[Composite] flux-pulid 완료:', replicateOutput);
 
-        const generatedUrl = Array.isArray(replicateOutput) ? replicateOutput[0] : replicateOutput;
-        if (!generatedUrl) throw new Error('결과 URL 없음');
+        const outputFile = Array.isArray(replicateOutput) ? replicateOutput[0] : replicateOutput;
+        if (!outputFile) throw new Error('결과 없음');
 
-        const swapFetchRes = await fetch(generatedUrl);
-        if (!swapFetchRes.ok) throw new Error(`결과 다운로드 실패 (${swapFetchRes.status})`);
-        const downloadedBuffer = Buffer.from(await swapFetchRes.arrayBuffer());
+        const blob = await (typeof outputFile.blob === 'function' ? outputFile.blob() : fetch(String(outputFile)).then(r => r.blob()));
+        const downloadedBuffer = Buffer.from(await blob.arrayBuffer());
 
         // [3단계] Sharp 2x: 결과 이미지 업스케일 (로컬, 무료)
         console.log('[Composite] 결과 이미지 업스케일 중...');
