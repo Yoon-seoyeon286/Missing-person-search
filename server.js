@@ -174,7 +174,8 @@ app.post('/api/composite', (req, res, next) => {
         console.log('[Composite] flux-pulid 전신 생성 중...');
         let replicateOutput;
         try {
-            replicateOutput = await replicate.run('zsxkib/flux-pulid', {
+            let prediction = await replicate.predictions.create({
+                model: 'zsxkib/flux-pulid',
                 input: {
                     main_face_image: faceUrl,
                     prompt: `RAW photo, full body shot of a ${bodyDesc} person, wearing ${outfit}, standing upright, entire body visible from head to toe including feet and shoes, full length, wide shot, feet on ground, neutral gray background, studio lighting, photorealistic, 8k.`,
@@ -187,6 +188,8 @@ app.post('/api/composite', (req, res, next) => {
                     true_cfg: 1.5,
                 },
             });
+            prediction = await replicate.wait(prediction);
+            replicateOutput = prediction.output;
         } catch (e) {
             console.error('[Composite] flux-pulid 오류:', e);
             return res.status(500).json({ error: '이미지 생성 실패: ' + (e?.message || String(e)) });
