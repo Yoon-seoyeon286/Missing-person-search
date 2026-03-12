@@ -153,29 +153,11 @@ app.post('/api/composite', (req, res, next) => {
         }
         if (!outfit) outfit = 'casual clothes';
 
-        // 얼굴 사진 업스케일링 (화질 개선)
-        console.log('[Composite] 얼굴 사진 업스케일링 중...');
-        const { Blob } = require('node:buffer');
-        let faceBuffer = faceFile.buffer;
-        try {
-            const upscaleBase64 = `data:${faceFile.mimetype};base64,${faceFile.buffer.toString('base64')}`;
-            const upscaleOutput = await replicate.run('nightmareai/real-esrgan:f121d640bd286e1fdc67f9799164c1d5be36ff74576ee2d96b1c9b1be498f4e5', {
-                input: { image: upscaleBase64, scale: 2, face_enhance: true },
-            });
-            const upscaleUrl = Array.isArray(upscaleOutput) ? upscaleOutput[0] : upscaleOutput;
-            const upscaleFetch = await fetch(upscaleUrl);
-            if (upscaleFetch.ok) {
-                faceBuffer = Buffer.from(await upscaleFetch.arrayBuffer());
-                console.log('[Composite] 업스케일링 완료');
-            }
-        } catch (e) {
-            console.warn('[Composite] 업스케일링 실패, 원본 사용:', e?.message);
-        }
-
         // 얼굴 사진 fal.ai 스토리지 업로드
         //교체: S3/R2 presigned URL 또는 직접 업로드 후 공개 URL 반환
         console.log('[Composite] 얼굴 사진 업로드 중...');
-        const faceUrl = await fal.storage.upload(new Blob([faceBuffer], { type: faceFile.mimetype }));
+        const { Blob } = require('node:buffer');
+        const faceUrl = await fal.storage.upload(new Blob([faceFile.buffer], { type: faceFile.mimetype }));
         console.log('[Composite] 업로드 완료:', faceUrl);
 
         // zsxkib/flux-pulid (Replicate): 얼굴 보존하면서 전신 생성
@@ -187,9 +169,9 @@ app.post('/api/composite', (req, res, next) => {
                     main_face_image: faceUrl,
                     prompt: `RAW photo, full body shot of a ${bodyDesc} person, wearing ${outfit}, standing upright, entire body visible from head to toe including feet and shoes, full length, wide shot, feet on ground, neutral gray background, studio lighting, photorealistic, 8k.`,
                     negative_prompt: 'cartoon, illustration, anime, drawing, painting, digital art, CGI, 3D render, cropped body, cut off feet, cut off legs, partial body, headshot, portrait, close-up, waist up, half body, missing feet, floating, bad anatomy, deformed, ugly, blurry, low quality, worst quality, nsfw',
-                    width: 768,
-                    height: 1280,
-                    num_steps: 20,
+                    width: 896,
+                    height: 1536,
+                    num_steps: 30,
                     id_weight: 1.0,
                     guidance_scale: 3.5,
                     true_cfg: 1.5,
