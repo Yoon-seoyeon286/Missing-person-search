@@ -187,7 +187,7 @@ app.post('/api/composite', (req, res, next) => {
                     negative_prompt: 'cartoon, illustration, anime, drawing, painting, digital art, CGI, 3D render, cropped body, cut off feet, cut off legs, partial body, headshot, portrait, close-up, waist up, half body, missing feet, floating, bad anatomy, deformed, ugly, blurry, low quality, worst quality, nsfw',
                     width: 768,
                     height: 1280,
-                    num_steps: 30,
+                    num_steps: 20,
                     id_weight: 1.0,
                     guidance_scale: 3.5,
                     true_cfg: 1.5,
