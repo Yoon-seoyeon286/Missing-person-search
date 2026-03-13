@@ -174,8 +174,13 @@ app.post('/api/composite', (req, res, next) => {
         console.log('[Composite] flux-pulid 전신 생성 중...');
         let replicateOutput;
         try {
+            const fluxModel = await replicate.models.get('zsxkib', 'flux-pulid');
+            const fluxVersion = fluxModel.latest_version?.id;
+            if (!fluxVersion) throw new Error('flux-pulid 버전을 가져올 수 없습니다');
+            console.log('[Composite] flux-pulid 버전:', fluxVersion);
+
             let prediction = await replicate.predictions.create({
-                model: 'zsxkib/flux-pulid',
+                version: fluxVersion,
                 input: {
                     main_face_image: faceUrl,
                     prompt: `RAW photo, full body shot of a ${bodyDesc} person, wearing ${outfit}, standing upright, entire body visible from head to toe including feet and shoes, full length, wide shot, feet on ground, neutral gray background, studio lighting, photorealistic, 85mm lens, natural skin texture, real lighting, high detail, DSLR photo, 8k.`,
