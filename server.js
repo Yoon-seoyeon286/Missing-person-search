@@ -178,7 +178,7 @@ app.post('/api/composite', (req, res, next) => {
                 model: 'zsxkib/flux-pulid',
                 input: {
                     main_face_image: faceUrl,
-                    prompt: `RAW photo, full body shot of a ${bodyDesc} person, wearing ${outfit}, standing upright, entire body visible from head to toe including feet and shoes, full length, wide shot, feet on ground, neutral gray background, studio lighting, photorealistic, 8k.`,
+                    prompt: `RAW photo, full body shot of a ${bodyDesc} person, wearing ${outfit}, standing upright, entire body visible from head to toe including feet and shoes, full length, wide shot, feet on ground, neutral gray background, studio lighting, photorealistic, 85mm lens, natural skin texture, real lighting, high detail, DSLR photo, 8k.`,
                     negative_prompt: 'cartoon, illustration, anime, drawing, painting, digital art, CGI, 3D render, cropped body, cut off feet, cut off legs, partial body, headshot, portrait, close-up, waist up, half body, missing feet, floating, bad anatomy, deformed, ugly, blurry, low quality, worst quality, nsfw',
                     width: 768,
                     height: 1280,
